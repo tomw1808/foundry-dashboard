@@ -247,7 +247,11 @@ function App() {
           // If 'to' is null or undefined (contract creation), set to ZERO ADDRESS
           // as sendTransaction might require *some* address.
           sanitizedTx.to = '0x0000000000000000000000000000000000000000';
-          console.log(`[${requestId}] 'to' address is null/undefined, setting to zero address for sendTransaction.`);
+          console.log(`[${requestId}] 'to' address is null/undefined (contract creation).`);
+          // Ensure 'to' is explicitly null for the direct ethereum.request call if needed,
+          // or simply ensure it's not present if the wallet handles omission correctly.
+          // Let's try omitting it first from the object passed to the direct call.
+          delete sanitizedTx.to;
         }
         // --- ---
 
