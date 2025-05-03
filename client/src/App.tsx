@@ -1,9 +1,11 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi'; // Import usePublicClient
 import { useEffect, useState } from 'react';
+import { Address } from 'viem'; // Import Address type
 
 function App() {
   const { address, chainId, isConnected } = useAccount();
+  const publicClient = usePublicClient(); // Get the public client instance from Wagmi
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<any[]>([]); // Store incoming messages
 
@@ -57,9 +59,11 @@ function App() {
   const handleRpcRequest = async (requestId: string, payload: { method: string; params: any[]; id: number | string }) => {
     console.log(`Handling RPC Request ${requestId}:`, payload);
 
-    if (!isConnected || !address || !chainId) {
-      console.error('Wallet not connected, cannot handle RPC request');
-      sendRpcResponse(requestId, { error: { code: -32000, message: 'Wallet not connected' } });
+    // Ensure wallet is connected AND publicClient is available
+    if (!isConnected || !address || !chainId || !publicClient) {
+      const errorMsg = !publicClient ? 'RPC client unavailable' : 'Wallet not connected';
+      console.error(`${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
+      sendRpcResponse(requestId, { error: { code: -32000, message: errorMsg } });
       return;
     }
 
@@ -78,14 +82,39 @@ function App() {
         case 'eth_requestAccounts': // Often used by dapps, similar to eth_accounts
            result = [address];
            break;
+        case 'eth_getTransactionCount':
+          try {
+            // Extract address and block tag from params (handle potential undefined)
+            const targetAddress = payload.params?.[0] as Address | undefined;
+            const blockTag = payload.params?.[1] as 'latest' | 'pending' | 'earliest' | string | undefined;
+
+            if (!targetAddress) {
+              console.error(`Missing address parameter for eth_getTransactionCount in request ${requestId}`);
+              error = { code: -32602, message: 'Invalid params: Missing address for eth_getTransactionCount' };
+              break; // Exit case
+            }
+
+            console.log(`Fetching nonce for ${targetAddress} at block ${blockTag || 'pending'}`);
+            const nonce = await publicClient.getTransactionCount({
+              address: targetAddress,
+              blockTag: blockTag || 'pending', // Default to 'pending' as scripts often need the next nonce
+            });
+            result = `0x${nonce.toString(16)}`;
+            console.log(`Nonce for ${targetAddress}: ${result}`);
+          } catch (err: any) {
+            console.error(`Error getting transaction count for request ${requestId}:`, err);
+            error = { code: err.code || -32603, message: `Failed to get transaction count: ${err.message}` };
+          }
+          break;
         // Add cases for other common read-only methods if needed (eth_call, eth_estimateGas etc.)
-        // These might require using wagmi hooks or viem directly
         // case 'eth_call':
-        //   // Example using window.ethereum (less type-safe)
-        //   result = await window.ethereum?.request({ method: 'eth_call', params: payload.params });
+        //   result = await publicClient.call({ /* construct params */ });
         //   break;
+        // case 'eth_estimateGas':
+        //    result = await publicClient.estimateGas({ /* construct params */ });
+        //    break;
         default:
-          console.warn(`Unhandled RPC method: ${payload.method}. Attempting direct request.`);
+          console.warn(`Unhandled RPC method in switch: ${payload.method}. Attempting direct request via window.ethereum.`);
           // Fallback for methods not explicitly handled (use with caution)
           try {
              result = await window.ethereum?.request({ method: payload.method, params: payload.params });
