@@ -229,8 +229,8 @@ function App() {
           ...(rawTx.maxFeePerGas && { maxFeePerGas: BigInt(rawTx.maxFeePerGas) }), // For EIP-1559 tx
           ...(rawTx.maxPriorityFeePerGas && { maxPriorityFeePerGas: BigInt(rawTx.maxPriorityFeePerGas) }), // For EIP-1559 tx
           ...(rawTx.value && { value: BigInt(rawTx.value) }),
-          // Nonce can often be left as is if it's already a number, but converting from hex if needed:
-          ...(rawTx.nonce && (typeof rawTx.nonce === 'string' && { nonce: parseInt(rawTx.nonce, 16) })).toString(),
+          // Nonce needs to be a number for viem
+          ...(rawTx.nonce !== undefined && { nonce: typeof rawTx.nonce === 'string' ? parseInt(rawTx.nonce, 16) : rawTx.nonce }),
           // Ensure 'from' is correctly typed as Address (string)
           ...(rawTx.from && { from: rawTx.from as Address }),
           // DO NOT explicitly set 'to' or 'data' here initially; handle below
@@ -276,41 +276,10 @@ function App() {
             typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
         , 2));
 
-        // // --- Choose execution path: Direct call for creation, viem for others ---
-        // if (rawTx.to === null || rawTx.to === undefined) {
-        //   rawTx.to = "";
-        //   // Contract Creation: Use direct window.ethereum.request
-        //   const { request } = walletClient.transport;
-
-        //   // Pass the sanitized object, ensuring 'to' is omitted or null as expected by the wallet
-        //   // We previously deleted 'to' from sanitizedTx in this case.
-
-        //   // --- Convert BigInts back to Hex Strings for direct request ---
-        //   const txForRequest: Record<string, any> = {};
-        //   for (const key in sanitizedTx) {
-        //     const value = (sanitizedTx as any)[key];
-        //     if (typeof value === 'bigint') {
-        //       // Handle 0n specifically, otherwise convert to hex
-        //       txForRequest[key] = value === 0n ? '0x0' : `0x${value.toString(16)}`;
-        //     } else {
-        //       txForRequest[key] = value;
-        //     }
-        //   }
-        //   console.log(`[${requestId}] Transaction object prepared for transport request:`, JSON.stringify(txForRequest, null, 2));
-        //   // --- ---
-
-        //   result = await request({
-        //      method: 'eth_sendTransaction',
-        //      params: [txForRequest], // Pass the hex-converted object
-        //   });
-        //   console.log(`Contract creation transaction sent directly for ${requestId}, hash: ${result}`);
-        // } else {
-          // Regular Transaction: Use viem's walletClient
-          console.log(`[${requestId}] Using walletClient.sendTransaction for regular transaction...`);
-          result = await walletClient.sendTransaction(sanitizedTx);
-          console.log(`Transaction sent via walletClient for ${requestId}, hash: ${result}`);
-        // }
-        // --- ---
+        // Always use viem's walletClient now
+        console.log(`[${requestId}] Using walletClient.sendTransaction...`);
+        result = await walletClient.sendTransaction(sanitizedTx);
+        console.log(`Transaction sent via walletClient for ${requestId}, hash: ${result}`);
 
       } else {
          // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
