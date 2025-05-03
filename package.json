@@ -23,7 +23,7 @@
   ],
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0",
+    "express": "^4.19.2", // Downgrade to latest Express v4 stable
     "open": "^10.1.2",
     "ws": "^8.18.2"
   },
