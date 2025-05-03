@@ -244,6 +244,8 @@ function App() {
           sanitizedTx.data = rawTx.data as `0x${string}`;
           console.log(`[${requestId}] Using rawTx.data for sanitizedTx.data`);
         }
+        // --- Delete the original 'input' field if it exists ---
+        delete sanitizedTx.input;
         // --- ---
 
         // --- Explicitly handle the 'to' field ---
