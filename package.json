@@ -9,9 +9,9 @@
   "scripts": {
     "server": "node server/server.js",
     "server:dev": "nodemon server/server.js",
-    "client:dev": "echo \"Client development server not set up yet. Run 'cd client && npm run dev' manually.\" && exit 0",
+    "client:dev": "cd client && npm run dev",
     "dev": "concurrently \"npm:server:dev\" \"npm:client:dev\"",
-    "build:client": "echo \"Client build not set up yet. Run 'cd client && npm run build' manually.\" && exit 0",
+    "build:client": "cd client && npm run build",
     "build": "npm run build:client",
     "start": "node ./bin/forge-dashboard.js",
     "prestart": "npm run build"
