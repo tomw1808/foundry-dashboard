@@ -1,0 +1,38 @@
+{
+  "name": "forge-dashboard",
+  "version": "0.1.0",
+  "description": "A local dashboard for interacting with Foundry projects via browser wallets.",
+  "main": "server/server.js",
+  "bin": {
+    "forge-dashboard": "./bin/forge-dashboard.js"
+  },
+  "scripts": {
+    "server": "node server/server.js",
+    "server:dev": "nodemon server/server.js",
+    "client:dev": "echo \"Client development server not set up yet. Run 'cd client && npm run dev' manually.\" && exit 0",
+    "dev": "concurrently \"npm:server:dev\" \"npm:client:dev\"",
+    "build:client": "echo \"Client build not set up yet. Run 'cd client && npm run build' manually.\" && exit 0",
+    "build": "npm run build:client",
+    "start": "node ./bin/forge-dashboard.js",
+    "prestart": "npm run build"
+  },
+  "files": [
+    "bin/",
+    "server/",
+    "client/dist/"
+  ],
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "open": "^8.4.0",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.1",
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "license": "MIT"
+}
