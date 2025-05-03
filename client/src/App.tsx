@@ -1,14 +1,20 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, usePublicClient } from 'wagmi';
-import { useEffect, useState, useRef } from 'react'; // Import useRef
-import { Address } from 'viem';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi'; // Import useWalletClient
+import { useEffect, useState, useRef } from 'react';
+import { Address, TransactionRequest } from 'viem'; // Import TransactionRequest
+
+// Define types for RPC payload and signing request
+type RpcPayload = { method: string; params: any[]; id: number | string };
+type SignRequest = { requestId: string; payload: RpcPayload };
 
 function App() {
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient();
-  const wsRef = useRef<WebSocket | null>(null); // Use useRef for WebSocket instance
-  const [messages, setMessages] = useState<any[]>([]);
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting'); // State for display
+  const { data: walletClient } = useWalletClient(); // Get wallet client for signing
+  const wsRef = useRef<WebSocket | null>(null);
+  const [messages, setMessages] = useState<any[]>([]); // Log of all messages
+  const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]); // State for signing requests
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
 
   // --- WebSocket Connection ---
   useEffect(() => {
