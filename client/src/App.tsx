@@ -57,19 +57,22 @@ function App() {
 
   // --- RPC Request Handling ---
   const handleRpcRequest = async (requestId: string, payload: { method: string; params: any[]; id: number | string }) => {
-    // --- Capture the current WebSocket instance ---
-    const currentWs = ws;
+    // --- Access the WebSocket instance via the ref ---
+    const currentWs = wsRef.current;
     // --- ---
 
     console.log(`Handling RPC Request ${requestId}:`, payload);
 
-    // Ensure wallet is connected AND publicClient is available
-    if (!isConnected || !address || !chainId || !publicClient || !currentWs) { // Also check currentWs
-      const errorMsg = !currentWs ? 'WebSocket unavailable' : !publicClient ? 'RPC client unavailable' : 'Wallet not connected';
+    // Ensure wallet is connected, publicClient is available, AND WebSocket is open
+    if (!isConnected || !address || !chainId || !publicClient || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      const wsState = currentWs ? WebSocket.OPEN ? 'open' : WebSocket.CONNECTING ? 'connecting' : WebSocket.CLOSING ? 'closing' : 'closed' : 'null';
+      const errorMsg = !currentWs || currentWs.readyState !== WebSocket.OPEN ? `WebSocket not open (state: ${wsState})` : !publicClient ? 'RPC client unavailable' : 'Wallet not connected';
       console.error(`${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
-      // Send response only if WebSocket was available at the start
-      if (currentWs) {
+      // Attempt to send error back only if WS was open initially
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
          sendRpcResponse(currentWs, requestId, { error: { code: -32000, message: errorMsg } });
+      } else {
+         console.warn(`Cannot send error response for ${requestId} because WebSocket is not open.`);
       }
       return;
     }
@@ -156,9 +159,9 @@ function App() {
 
   // --- Send Response back via WebSocket ---
   // Modify to accept the WebSocket instance as the first argument
-  const sendRpcResponse = (socketInstance: WebSocket | null, requestId: string, response: { result?: any; error?: any }) => {
-    // Check the passed instance, not the state variable 'ws'
-    if (socketInstance && socketInstance.readyState === WebSocket.OPEN) {
+  const sendRpcResponse = (socketInstance: WebSocket, requestId: string, response: { result?: any; error?: any }) => {
+    // No need to check null here as handleRpcRequest already does, but check state
+    if (socketInstance.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({
         type: 'rpcResponse',
         requestId: requestId, // Use the requestId passed to this function
@@ -168,8 +171,7 @@ function App() {
       socketInstance.send(message); // Use the passed instance
     } else {
       // Log based on the state of the passed instance
-      const reason = !socketInstance ? 'instance is null' : `state is ${socketInstance.readyState}`;
-      console.error(`WebSocket not open (${reason}), cannot send RPC response for ${requestId}`);
+      console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send RPC response for ${requestId}`);
     }
   };
 
@@ -184,7 +186,12 @@ function App() {
       <main className="w-full max-w-4xl mt-8 p-4 bg-gray-800 rounded shadow-lg">
         <h2 className="text-xl mb-4">Dashboard Status</h2>
         <div className="mb-4">
-          <p>WebSocket Status: {ws?.readyState === WebSocket.OPEN ? <span className="text-green-400">Connected</span> : <span className="text-red-400">Disconnected</span>}</p>
+          {/* Display status based on wsStatus state */}
+          <p>WebSocket Status: {
+             wsStatus === 'open' ? <span className="text-green-400">Connected</span> :
+             wsStatus === 'connecting' ? <span className="text-yellow-400">Connecting...</span> :
+             <span className="text-red-400">{wsStatus === 'error' ? 'Error' : 'Disconnected'}</span>
+          }</p>
           <p>Wallet Status: {isConnected ? <span className="text-green-400">Connected</span> : <span className="text-red-400">Not Connected</span>}</p>
           {isConnected && (
             <>
