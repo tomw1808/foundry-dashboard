@@ -248,9 +248,7 @@ function App() {
           // as sendTransaction might require *some* address.
           sanitizedTx.to = '0x0000000000000000000000000000000000000000';
           console.log(`[${requestId}] 'to' address is null/undefined (contract creation).`);
-          // Ensure 'to' is explicitly null for the direct ethereum.request call if needed,
-          // or simply ensure it's not present if the wallet handles omission correctly.
-          // Let's try omitting it first from the object passed to the direct call.
+          // Ensure 'to' is omitted from the object passed to window.ethereum.request
           delete sanitizedTx.to;
         }
         // --- ---
@@ -269,9 +267,27 @@ function App() {
             typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
         , 2));
 
-        // Request signature and sending via wallet client using the sanitized object
-        result = await walletClient.sendTransaction({...sanitizedTx} as any);
-        console.log(`Transaction sent for ${requestId}, hash: ${result}`);
+        // --- Choose execution path: Direct call for creation, viem for others ---
+        if (rawTx.to === null || rawTx.to === undefined) {
+          // Contract Creation: Use direct window.ethereum.request
+          console.log(`[${requestId}] Using window.ethereum.request for contract creation...`);
+          if (!window.ethereum) {
+            throw new Error('MetaMask or other Ethereum wallet provider not found.');
+          }
+          // Pass the sanitized object, ensuring 'to' is omitted or null as expected by the wallet
+          // We previously deleted 'to' from sanitizedTx in this case.
+          result = await window.ethereum.request({
+             method: 'eth_sendTransaction',
+             params: [sanitizedTx], // Pass the sanitized object
+          });
+          console.log(`Contract creation transaction sent directly for ${requestId}, hash: ${result}`);
+        } else {
+          // Regular Transaction: Use viem's walletClient
+          console.log(`[${requestId}] Using walletClient.sendTransaction for regular transaction...`);
+          result = await walletClient.sendTransaction(sanitizedTx);
+          console.log(`Transaction sent via walletClient for ${requestId}, hash: ${result}`);
+        }
+        // --- ---
 
       } else {
          // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
