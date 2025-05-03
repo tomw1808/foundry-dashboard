@@ -233,8 +233,7 @@ function App() {
           ...(rawTx.nonce && typeof rawTx.nonce === 'string' && { nonce: parseInt(rawTx.nonce, 16) }),
           // Ensure 'from' is correctly typed as Address (string)
           ...(rawTx.from && { from: rawTx.from as Address }),
-          // DO NOT explicitly set 'to' here; handle it below
-          // ...(rawTx.to && { to: rawTx.to as Address }), // Removed this line
+          // DO NOT explicitly set 'to' here initially
           // Data should be a hex string `0x...`
           ...(rawTx.data && { data: rawTx.data as `0x${string}` }),
         };
@@ -245,12 +244,10 @@ function App() {
           sanitizedTx.to = rawTx.to as Address;
           console.log(`[${requestId}] Setting 'to' address: ${sanitizedTx.to}`);
         } else {
-          // If 'to' is null or undefined in rawTx (contract creation),
-          // ensure it's *not* present in sanitizedTx.
-          // The spread operator above already omitted it if rawTx.to was null/undefined.
-          // We can optionally delete just in case, though it shouldn't be necessary.
-          delete sanitizedTx.to;
-          console.log(`[${requestId}] 'to' address is null/undefined, ensuring it's omitted for contract creation.`);
+          // If 'to' is null or undefined (contract creation), set to ZERO ADDRESS
+          // as sendTransaction might require *some* address.
+          sanitizedTx.to = '0x0000000000000000000000000000000000000000';
+          console.log(`[${requestId}] 'to' address is null/undefined, setting to zero address for sendTransaction.`);
         }
         // --- ---
 
