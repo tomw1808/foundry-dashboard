@@ -57,13 +57,20 @@ function App() {
 
   // --- RPC Request Handling ---
   const handleRpcRequest = async (requestId: string, payload: { method: string; params: any[]; id: number | string }) => {
+    // --- Capture the current WebSocket instance ---
+    const currentWs = ws;
+    // --- ---
+
     console.log(`Handling RPC Request ${requestId}:`, payload);
 
     // Ensure wallet is connected AND publicClient is available
-    if (!isConnected || !address || !chainId || !publicClient) {
-      const errorMsg = !publicClient ? 'RPC client unavailable' : 'Wallet not connected';
+    if (!isConnected || !address || !chainId || !publicClient || !currentWs) { // Also check currentWs
+      const errorMsg = !currentWs ? 'WebSocket unavailable' : !publicClient ? 'RPC client unavailable' : 'Wallet not connected';
       console.error(`${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
-      sendRpcResponse(requestId, { error: { code: -32000, message: errorMsg } });
+      // Send response only if WebSocket was available at the start
+      if (currentWs) {
+         sendRpcResponse(currentWs, requestId, { error: { code: -32000, message: errorMsg } });
+      }
       return;
     }
 
@@ -133,30 +140,36 @@ function App() {
           }
       }
 
+      // Use the captured WebSocket instance (currentWs) to send the response
       if (error) {
-        sendRpcResponse(requestId, { error });
+        sendRpcResponse(currentWs, requestId, { error });
       } else {
-        sendRpcResponse(requestId, { result });
+        sendRpcResponse(currentWs, requestId, { result });
       }
 
     } catch (err: any) {
       console.error(`Error processing RPC request ${requestId} (${payload.method}):`, err);
-      sendRpcResponse(requestId, { error: { code: -32603, message: err.message || 'Internal JSON-RPC error' } });
+      // Use the captured WebSocket instance (currentWs) to send the error response
+      sendRpcResponse(currentWs, requestId, { error: { code: -32603, message: err.message || 'Internal JSON-RPC error' } });
     }
   };
 
   // --- Send Response back via WebSocket ---
-  const sendRpcResponse = (requestId: string, response: { result?: any; error?: any }) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
+  // Modify to accept the WebSocket instance as the first argument
+  const sendRpcResponse = (socketInstance: WebSocket | null, requestId: string, response: { result?: any; error?: any }) => {
+    // Check the passed instance, not the state variable 'ws'
+    if (socketInstance && socketInstance.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({
         type: 'rpcResponse',
-        requestId: requestId,
+        requestId: requestId, // Use the requestId passed to this function
         ...response,
       });
       console.log(`Sending RPC Response for ${requestId}:`, message);
-      ws.send(message);
+      socketInstance.send(message); // Use the passed instance
     } else {
-      console.error('WebSocket not connected, cannot send RPC response for', requestId);
+      // Log based on the state of the passed instance
+      const reason = !socketInstance ? 'instance is null' : `state is ${socketInstance.readyState}`;
+      console.error(`WebSocket not open (${reason}), cannot send RPC response for ${requestId}`);
     }
   };
 
