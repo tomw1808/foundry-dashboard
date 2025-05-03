@@ -94,16 +94,25 @@ function App() {
               break; // Exit case
             }
 
-            console.log(`Fetching nonce for ${targetAddress} at block ${blockTag || 'pending'}`);
+            console.log(`[${requestId}] Attempting to fetch nonce for ${targetAddress} at block ${blockTag || 'pending'} using publicClient...`);
+            // Add a specific check for publicClient just before using it
+            if (!publicClient) {
+               console.error(`[${requestId}] publicClient is null or undefined when trying eth_getTransactionCount!`);
+               error = { code: -32603, message: 'Internal error: publicClient not available' };
+               break; // Exit case
+            }
+
             const nonce = await publicClient.getTransactionCount({
               address: targetAddress,
               blockTag: blockTag || 'pending', // Default to 'pending' as scripts often need the next nonce
             });
+            // If the above line completes, log success
+            console.log(`[${requestId}] Successfully fetched nonce for ${targetAddress}: ${nonce}`);
             result = `0x${nonce.toString(16)}`;
-            console.log(`Nonce for ${targetAddress}: ${result}`);
           } catch (err: any) {
-            console.error(`Error getting transaction count for request ${requestId}:`, err);
-            error = { code: err.code || -32603, message: `Failed to get transaction count: ${err.message}` };
+            // Log the specific error encountered during the fetch
+            console.error(`[${requestId}] Error calling publicClient.getTransactionCount:`, err);
+            error = { code: err.code || -32603, message: `Failed to get transaction count: ${err.message || 'Unknown error'}` };
           }
           break;
         // Add cases for other common read-only methods if needed (eth_call, eth_estimateGas etc.)
