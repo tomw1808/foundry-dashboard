@@ -31,9 +31,17 @@ function App() {
         const message = JSON.parse(event.data);
         setMessages((prev) => [...prev, message]); // Add message to state
 
-        // Handle incoming RPC requests from backend
+        // Handle incoming requests from backend
         if (message.type === 'rpcRequest') {
           handleRpcRequest(message.requestId, message.payload);
+        } else if (message.type === 'signRequest') {
+          console.log('Received signRequest:', message);
+          // Add to pending requests state if not already present
+          setPendingSignRequests((prev) =>
+             prev.find((req) => req.requestId === message.requestId)
+               ? prev
+               : [...prev, { requestId: message.requestId, payload: message.payload }]
+          );
         }
 
       } catch (error) {
@@ -176,7 +184,96 @@ function App() {
       socketInstance.send(message); // Use the passed instance
     } else {
       // Log based on the state of the passed instance
-      console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send RPC response for ${requestId}`);
+      console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send response for ${requestId}`);
+    }
+  };
+
+  // --- Sign Transaction Handler ---
+  const handleSignTransaction = async (request: SignRequest) => {
+    const { requestId, payload } = request;
+    const currentWs = wsRef.current;
+
+    console.log(`Attempting to sign request ${requestId}:`, payload);
+
+    if (!walletClient || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      const reason = !walletClient ? 'Wallet client not available' : 'WebSocket not open';
+      console.error(`${reason}, cannot sign transaction for ${requestId}`);
+      // Optionally send error back if possible
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+         sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+      }
+      // Remove the request from UI even if we can't send error
+      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+      return;
+    }
+
+    try {
+      let result: any;
+      // Assuming eth_sendTransaction is the primary signing method for now
+      if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
+        // Prepare transaction object (ensure correct types)
+        const tx = payload.params[0] as TransactionRequest;
+        console.log(`Sending transaction via walletClient for ${requestId}:`, tx);
+
+        // Request signature and sending via wallet client
+        result = await walletClient.sendTransaction(tx);
+        console.log(`Transaction sent for ${requestId}, hash: ${result}`);
+
+      } else {
+         // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
+         // Example:
+         // if (payload.method === 'personal_sign' && payload.params?.[0] && payload.params?.[1]) {
+         //   const message = payload.params[0];
+         //   const account = payload.params[1] as Address;
+         //   result = await walletClient.signMessage({ account, message });
+         // } else { ... }
+         throw new Error(`Unsupported signing method: ${payload.method}`);
+      }
+
+      // Send success response back
+      sendSignResponse(currentWs, requestId, { result });
+
+    } catch (err: any) {
+      console.error(`Error signing/sending transaction for ${requestId}:`, err);
+      // Standard JSON-RPC error codes: https://eips.ethereum.org/EIPS/eip-1474#error-codes
+      // 4001 is user rejection
+      const errorCode = err.code === 4001 ? 4001 : -32000; // Use -32000 for generic internal errors
+      const errorMessage = err.shortMessage || err.message || 'User rejected or transaction failed';
+      sendSignResponse(currentWs, requestId, { error: { code: errorCode, message: errorMessage } });
+    } finally {
+      // Remove the request from the UI after handling
+      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+    }
+  };
+
+  // --- Reject Transaction Handler ---
+  const handleRejectTransaction = (requestId: string) => {
+    const currentWs = wsRef.current;
+    console.log(`User rejected request ${requestId}`);
+    if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+      sendSignResponse(currentWs, requestId, {
+        error: { code: 4001, message: 'User rejected the request.' }
+      });
+    } else {
+       console.warn(`Cannot send rejection for ${requestId} because WebSocket is not open.`);
+    }
+    // Remove the request from the UI
+    setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+  };
+
+  // --- Send Signing Response back via WebSocket ---
+  // Note: This is similar to sendRpcResponse but uses a different type
+  const sendSignResponse = (socketInstance: WebSocket, requestId: string, response: { result?: any; error?: any }) => {
+    if (socketInstance.readyState === WebSocket.OPEN) {
+      const message = JSON.stringify({
+        type: 'signResponse', // Use 'signResponse' type
+        requestId: requestId,
+        ...response,
+      });
+      console.log(`Sending Sign Response for ${requestId}:`, message);
+      socketInstance.send(message);
+    } else {
+      console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send sign response for ${requestId}`);
     }
   };
 
@@ -184,7 +281,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
       <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700">
-        <h1 className="text-2xl font-bold">⚡️ Forge Dashboard</h1>
+        <h1 className="text-xl md:text-2xl font-bold">⚡️ Forge Dashboard</h1>
         <ConnectButton />
       </header>
 
@@ -206,11 +303,46 @@ function App() {
           )}
         </div>
 
-        <h3 className="text-lg mt-6 mb-2">Incoming Messages / Requests</h3>
+        {/* Section for Pending Signing Requests */}
+        {pendingSignRequests.length > 0 && (
+          <div className="mt-8 w-full">
+            <h3 className="text-xl mb-4 text-yellow-400">Pending Actions</h3>
+            {pendingSignRequests.map((request) => (
+              <div key={request.requestId} className="mb-4 p-4 border border-yellow-600 rounded bg-gray-800 shadow-md">
+                <h4 className="text-lg font-semibold mb-2">Request ID: <span className="font-mono text-sm">{request.requestId}</span></h4>
+                <p className="mb-1">Method: <span className="font-semibold">{request.payload.method}</span></p>
+                <div className="mb-3">
+                  <p>Parameters:</p>
+                  <pre className="whitespace-pre-wrap break-all text-xs bg-gray-700 p-2 rounded max-h-40 overflow-y-auto">
+                    {JSON.stringify(request.payload.params, null, 2)}
+                  </pre>
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => handleSignTransaction(request)}
+                    disabled={!walletClient || !isConnected}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Approve in Wallet
+                  </button>
+                  <button
+                    onClick={() => handleRejectTransaction(request.requestId)}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-semibold"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Section for Message Log */}
+        <h3 className="text-lg mt-6 mb-2">Message Log</h3>
         <div className="h-64 overflow-y-auto bg-gray-700 p-2 rounded font-mono text-xs">
           {messages.length === 0 && <p>No messages received yet.</p>}
-          {messages.map((msg, index) => (
-            <pre key={index} className="whitespace-pre-wrap break-all mb-1 p-1 bg-gray-600 rounded">{JSON.stringify(msg, null, 2)}</pre>
+          {messages.slice().reverse().map((msg, index) => ( // Show newest first
+            <pre key={messages.length - index -1} className="whitespace-pre-wrap break-all mb-1 p-1 bg-gray-600 rounded">{JSON.stringify(msg, null, 2)}</pre>
           ))}
         </div>
       </main>

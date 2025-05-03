@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server }); // Attach WebSocket server to the HTTP server
 
-// Store pending RPC requests: Map<requestId, { res: Response, originalId: number|string }>
+// Store pending RPC requests: Map<requestId, { res: Response, originalId: number|string, method: string }>
 const pendingRequests = new Map();
 
 const PORT = process.env.PORT || 3001; // Default port
@@ -26,12 +26,12 @@ wss.on('connection', (ws) => {
     try {
       const message = JSON.parse(rawMessage.toString());
 
-      // Check if it's a response to a pending RPC request
-      if (message.type === 'rpcResponse' && message.requestId) {
+      // Check if it's a response to a pending request (RPC or Signing)
+      if ((message.type === 'rpcResponse' || message.type === 'signResponse') && message.requestId) {
         const pending = pendingRequests.get(message.requestId);
 
         if (pending) {
-          console.log(`Received response for pending request: ${message.requestId}`);
+          console.log(`Received ${message.type} for pending request: ${message.requestId} (Method: ${pending.method})`);
           // Construct the JSON-RPC response
           const jsonRpcResponse = {
             jsonrpc: '2.0',
@@ -108,18 +108,28 @@ app.post('/api/rpc', (req, res) => {
     'eth_signTypedData_v4',
   ];
 
-  if (signingMethods.includes(method)) {
-    console.log(`Intercepted signing method: ${method}. Handling not implemented yet.`);
-    // TODO: Implement signing flow (store request, broadcast 'signRequest', wait for 'signResponse')
-    res.status(501).json({
-      jsonrpc: '2.0',
-      error: { code: -32000, message: `Signing method '${method}' handling not implemented yet` },
-      id: originalId
-    });
-    return; // Stop processing here for signing methods
-  }
+  // Determine if it's a signing method or a regular RPC call
+  const isSigningMethod = signingMethods.includes(method);
+  const requestType = isSigningMethod ? 'signRequest' : 'rpcRequest';
+  const responseType = isSigningMethod ? 'signResponse' : 'rpcResponse'; // Expected response type
 
-  // For all other methods, forward to the frontend via WebSocket
+  // 1. Generate a unique request ID for tracking the response
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+  console.log(`   ${isSigningMethod ? 'Intercepted' : 'Forwarding'} request ${requestId} for method ${method} (Original ID: ${originalId}) to frontend.`);
+
+  // 2. Store the original response object (`res`), original ID, and method
+  pendingRequests.set(requestId, { res, originalId, method });
+  console.log(`   Request ${requestId} stored. Pending requests: ${pendingRequests.size}`);
+
+  // 3. Broadcast the request details to the frontend via WebSocket
+  broadcast({
+    type: requestType, // Use 'signRequest' or 'rpcRequest'
+    requestId: requestId, // The ID the frontend should use to respond
+    payload: { method, params, id: originalId } // Send original RPC details
+  });
+
+  // 4. IMPORTANT: Do not respond to the HTTP request yet!
+  //    The response will be sent when the frontend replies via WebSocket.
 
   // 1. Generate a unique request ID for tracking the response
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -140,21 +150,97 @@ app.post('/api/rpc', (req, res) => {
   //    The response will be sent when the frontend replies via WebSocket.
 
   // Optional: Add a timeout to prevent requests from hanging indefinitely
-  const TIMEOUT_MS = 60000; // 60 seconds
-  setTimeout(() => {
+  // Increase timeout for signing methods as user interaction takes time
+  const TIMEOUT_MS = isSigningMethod ? 5 * 60 * 1000 : 60 * 1000; // 5 minutes for signing, 1 minute for RPC
+  const timeoutId = setTimeout(() => {
     if (pendingRequests.has(requestId)) {
-      console.error(`Request ${requestId} (Method: ${method}, Original ID: ${originalId}) timed out.`);
-      const pending = pendingRequests.get(requestId);
+      const pending = pendingRequests.get(requestId); // Get details before deleting
+      console.error(`Request ${requestId} (Method: ${pending.method}, Original ID: ${pending.originalId}) timed out after ${TIMEOUT_MS / 1000}s.`);
+      // Send appropriate error back to forge script
       pending.res.status(504).json({ // Gateway Timeout
         jsonrpc: '2.0',
-        error: { code: -32000, message: `Request timed out waiting for response from frontend wallet for method '${method}'` },
+        error: { code: -32000, message: `Request timed out waiting for ${responseType} from frontend wallet for method '${pending.method}'` },
         id: pending.originalId
       });
-      pendingRequests.delete(requestId);
+      pendingRequests.delete(requestId); // Remove from map
       console.log(`Removed timed out request: ${requestId}. Pending: ${pendingRequests.size}`);
     }
   }, TIMEOUT_MS);
 
+  // Store the timeoutId with the pending request so we can clear it if response arrives
+  const pendingData = pendingRequests.get(requestId);
+  if (pendingData) {
+      pendingData.timeoutId = timeoutId;
+  }
+
+});
+
+
+// --- Modify WebSocket message handler to clear timeout ---
+wss.on('connection', (ws) => {
+  console.log('Client connected via WebSocket');
+
+  ws.on('message', (rawMessage) => {
+    console.log('Received message from client:', rawMessage.toString());
+    try {
+      const message = JSON.parse(rawMessage.toString());
+
+      // Check if it's a response to a pending request (RPC or Signing)
+      if ((message.type === 'rpcResponse' || message.type === 'signResponse') && message.requestId) {
+        const pending = pendingRequests.get(message.requestId);
+
+        if (pending) {
+          console.log(`Received ${message.type} for pending request: ${message.requestId} (Method: ${pending.method})`);
+
+          // --- Clear the timeout ---
+          if (pending.timeoutId) {
+            clearTimeout(pending.timeoutId);
+            console.log(`Cleared timeout for request ${message.requestId}`);
+          }
+          // --- ---
+
+          // Construct the JSON-RPC response
+          const jsonRpcResponse = {
+            jsonrpc: '2.0',
+            id: pending.originalId,
+            ...(message.result !== undefined && { result: message.result }),
+            ...(message.error !== undefined && { error: message.error }),
+          };
+
+          // Send the response back to the original caller (forge script)
+          pending.res.json(jsonRpcResponse);
+
+          // Remove the request from the pending map
+          pendingRequests.delete(message.requestId);
+          console.log(`Completed and removed request: ${message.requestId}. Pending: ${pendingRequests.size}`);
+
+        } else {
+          console.warn(`Received response for unknown or already completed request ID: ${message.requestId}`);
+        }
+      } else {
+         // Handle other message types if needed
+         console.log('Received non-rpcResponse/non-signResponse message or message without requestId:', message);
+         // Example echo for other messages
+         ws.send(JSON.stringify({ type: 'echo', payload: message }));
+      }
+
+    } catch (e) {
+      console.error('Failed to parse message or handle response:', e);
+      ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON received or processing error' }));
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('Client disconnected');
+    // Optional: Clean up any pending requests associated with this specific client if needed
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+
+  // Send a welcome message
+  ws.send(JSON.stringify({ type: 'welcome', message: 'Connected to Forge Dashboard WebSocket' }));
 });
 
 // --- Static file serving ---
