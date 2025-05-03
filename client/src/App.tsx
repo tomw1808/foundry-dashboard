@@ -235,7 +235,8 @@ function App() {
           ...(rawTx.from && { from: rawTx.from as Address }),
           // DO NOT explicitly set 'to' here initially
           // Data should be a hex string `0x...`
-          ...(rawTx.data && { data: rawTx.data as `0x${string}` }),
+          data: rawTx.input ? rawTx.input as `0x${string}` : (rawTx.data && { data: rawTx.data as `0x${string}` }),
+          
         };
 
         // --- Explicitly handle the 'to' field ---
@@ -246,7 +247,6 @@ function App() {
         } else {
           // If 'to' is null or undefined (contract creation), set to ZERO ADDRESS
           // as sendTransaction might require *some* address.
-          sanitizedTx.to = '0x0000000000000000000000000000000000000000';
           console.log(`[${requestId}] 'to' address is null/undefined (contract creation).`);
           // Ensure 'to' is omitted from the object passed to window.ethereum.request
           delete sanitizedTx.to;
@@ -269,14 +269,13 @@ function App() {
 
         // --- Choose execution path: Direct call for creation, viem for others ---
         if (rawTx.to === null || rawTx.to === undefined) {
+          rawTx.to = "";
           // Contract Creation: Use direct window.ethereum.request
-          console.log(`[${requestId}] Using window.ethereum.request for contract creation...`);
-          if (!window.ethereum) {
-            throw new Error('MetaMask or other Ethereum wallet provider not found.');
-          }
+          const { request } = walletClient.transport;
+
           // Pass the sanitized object, ensuring 'to' is omitted or null as expected by the wallet
           // We previously deleted 'to' from sanitizedTx in this case.
-          result = await window.ethereum.request({
+          result = await request({
              method: 'eth_sendTransaction',
              params: [sanitizedTx], // Pass the sanitized object
           });
