@@ -233,11 +233,18 @@ function App() {
           ...(rawTx.nonce && typeof rawTx.nonce === 'string' && { nonce: parseInt(rawTx.nonce, 16) }),
           // Ensure 'from' is correctly typed as Address (string)
           ...(rawTx.from && { from: rawTx.from as Address }),
-          // DO NOT explicitly set 'to' here initially
-          // Data should be a hex string `0x...`
-          data: rawTx.input ? rawTx.input as `0x${string}` : (rawTx.data && { data: rawTx.data as `0x${string}` }),
-          
+          // DO NOT explicitly set 'to' or 'data' here initially; handle below
         };
+
+        // --- Explicitly handle 'data' (preferring 'input' from Foundry) ---
+        if (rawTx.input !== undefined && rawTx.input !== null) {
+          sanitizedTx.data = rawTx.input as `0x${string}`;
+          console.log(`[${requestId}] Mapping rawTx.input to sanitizedTx.data`);
+        } else if (rawTx.data !== undefined && rawTx.data !== null) {
+          sanitizedTx.data = rawTx.data as `0x${string}`;
+          console.log(`[${requestId}] Using rawTx.data for sanitizedTx.data`);
+        }
+        // --- ---
 
         // --- Explicitly handle the 'to' field ---
         if (rawTx.to !== null && rawTx.to !== undefined) {
