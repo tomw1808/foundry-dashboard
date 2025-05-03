@@ -233,11 +233,27 @@ function App() {
           ...(rawTx.nonce && typeof rawTx.nonce === 'string' && { nonce: parseInt(rawTx.nonce, 16) }),
           // Ensure 'from' is correctly typed as Address (string)
           ...(rawTx.from && { from: rawTx.from as Address }),
-          // Explicitly handle 'to': set to null if falsy (contract creation), otherwise set address
-          to: rawTx.to !== null && rawTx.to !== undefined ? rawTx.to as Address : undefined,
+          // DO NOT explicitly set 'to' here; handle it below
+          // ...(rawTx.to && { to: rawTx.to as Address }), // Removed this line
           // Data should be a hex string `0x...`
           ...(rawTx.data && { data: rawTx.data as `0x${string}` }),
         };
+
+        // --- Explicitly handle the 'to' field ---
+        if (rawTx.to !== null && rawTx.to !== undefined) {
+          // If 'to' exists in the raw transaction, add it as Address
+          sanitizedTx.to = rawTx.to as Address;
+          console.log(`[${requestId}] Setting 'to' address: ${sanitizedTx.to}`);
+        } else {
+          // If 'to' is null or undefined in rawTx (contract creation),
+          // ensure it's *not* present in sanitizedTx.
+          // The spread operator above already omitted it if rawTx.to was null/undefined.
+          // We can optionally delete just in case, though it shouldn't be necessary.
+          delete sanitizedTx.to;
+          console.log(`[${requestId}] 'to' address is null/undefined, ensuring it's omitted for contract creation.`);
+        }
+        // --- ---
+
         // Remove potentially problematic fields if they are null/undefined after sanitization
         // (e.g., don't send both gasPrice and EIP-1559 fields)
         if (sanitizedTx.maxFeePerGas !== undefined || sanitizedTx.maxPriorityFeePerGas !== undefined) {
@@ -246,12 +262,7 @@ function App() {
              delete sanitizedTx.maxFeePerGas;
              delete sanitizedTx.maxPriorityFeePerGas;
         }
-
-        if(sanitizedTx.to == null || sanitizedTx.to == "null" || sanitizedTx.to == undefined) {
-          console.log("To is null, removing it");
-          delete sanitizedTx.to;
-        }
-
+        // Removed the redundant delete block for 'to' here
 
         console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (key, value) =>
             typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
