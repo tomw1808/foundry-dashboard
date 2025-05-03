@@ -13,10 +13,12 @@
     "@radix-ui/react-slot": "^1.0.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "ethers": "^6.9.0", 
+    // "ethers": "^6.9.0", // Replaced by viem/wagmi
     "lucide-react": "^0.378.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "viem": "^2.7.1", // Core library
+    "wagmi": "^2.5.7", // React hooks for viem
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7"
   },
