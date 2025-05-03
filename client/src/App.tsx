@@ -300,20 +300,22 @@ function App() {
          throw new Error(`Unsupported signing method: ${payload.method}`);
       }
 
+      // Remove the request from the UI *before* sending the response
+      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
       // Send success response back
       sendSignResponse(currentWs, requestId, { result });
 
     } catch (err: any) {
+      // Remove the request from the UI *before* sending the error response
+      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
       console.error(`Error signing/sending transaction for ${requestId}:`, err);
       // Standard JSON-RPC error codes: https://eips.ethereum.org/EIPS/eip-1474#error-codes
       // 4001 is user rejection
       const errorCode = err.code === 4001 ? 4001 : -32000; // Use -32000 for generic internal errors
       const errorMessage = err.shortMessage || err.message || 'User rejected or transaction failed';
       sendSignResponse(currentWs, requestId, { error: { code: errorCode, message: errorMessage } });
-    } finally {
-      // Remove the request from the UI after handling
-      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
     }
+    // Removed finally block as state update is now done before sending response/error
   };
 
   // --- Reject Transaction Handler ---
