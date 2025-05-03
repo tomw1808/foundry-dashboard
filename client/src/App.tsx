@@ -234,7 +234,7 @@ function App() {
           // Ensure 'from' is correctly typed as Address (string)
           ...(rawTx.from && { from: rawTx.from as Address }),
           // Explicitly handle 'to': set to null if falsy (contract creation), otherwise set address
-          to: rawTx.to ? rawTx.to as Address : null,
+          to: rawTx.to !== null && rawTx.to !== undefined ? rawTx.to as Address : undefined,
           // Data should be a hex string `0x...`
           ...(rawTx.data && { data: rawTx.data as `0x${string}` }),
         };
@@ -247,13 +247,18 @@ function App() {
              delete sanitizedTx.maxPriorityFeePerGas;
         }
 
+        if(sanitizedTx.to == null || sanitizedTx.to == "null" || sanitizedTx.to == undefined) {
+          console.log("To is null, removing it");
+          delete sanitizedTx.to;
+        }
+
 
         console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (key, value) =>
             typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
         , 2));
 
         // Request signature and sending via wallet client using the sanitized object
-        result = await walletClient.sendTransaction(sanitizedTx);
+        result = await walletClient.sendTransaction({...sanitizedTx} as any);
         console.log(`Transaction sent for ${requestId}, hash: ${result}`);
 
       } else {
