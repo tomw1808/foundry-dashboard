@@ -217,12 +217,42 @@ function App() {
       let result: any;
       // Assuming eth_sendTransaction is the primary signing method for now
       if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
-        // Prepare transaction object (ensure correct types)
-        const tx = payload.params[0] as TransactionRequest;
-        console.log(`Sending transaction via walletClient for ${requestId}:`, tx);
+        const rawTx = payload.params[0] as any; // Receive as 'any' initially for inspection
+        console.log(`[${requestId}] Raw transaction object received:`, JSON.stringify(rawTx, null, 2));
 
-        // Request signature and sending via wallet client
-        result = await walletClient.sendTransaction(tx);
+        // --- Sanitize the transaction object ---
+        const sanitizedTx: TransactionRequest = {
+          ...rawTx,
+          // Explicitly convert gas-related fields and value from hex strings to bigint
+          ...(rawTx.gas && { gas: BigInt(rawTx.gas) }), // Optional: gas/gasLimit
+          ...(rawTx.gasPrice && { gasPrice: BigInt(rawTx.gasPrice) }), // For legacy tx
+          ...(rawTx.maxFeePerGas && { maxFeePerGas: BigInt(rawTx.maxFeePerGas) }), // For EIP-1559 tx
+          ...(rawTx.maxPriorityFeePerGas && { maxPriorityFeePerGas: BigInt(rawTx.maxPriorityFeePerGas) }), // For EIP-1559 tx
+          ...(rawTx.value && { value: BigInt(rawTx.value) }),
+          // Nonce can often be left as is if it's already a number, but converting from hex if needed:
+          ...(rawTx.nonce && typeof rawTx.nonce === 'string' && { nonce: parseInt(rawTx.nonce, 16) }),
+          // Ensure 'from' and 'to' are correctly typed as Address (string)
+          ...(rawTx.from && { from: rawTx.from as Address }),
+          ...(rawTx.to && { to: rawTx.to as Address }),
+          // Data should be a hex string `0x...`
+          ...(rawTx.data && { data: rawTx.data as `0x${string}` }),
+        };
+        // Remove potentially problematic fields if they are null/undefined after sanitization
+        // (e.g., don't send both gasPrice and EIP-1559 fields)
+        if (sanitizedTx.maxFeePerGas !== undefined || sanitizedTx.maxPriorityFeePerGas !== undefined) {
+            delete sanitizedTx.gasPrice; // Remove legacy gasPrice if EIP-1559 fields exist
+        } else if (sanitizedTx.gasPrice !== undefined) {
+             delete sanitizedTx.maxFeePerGas;
+             delete sanitizedTx.maxPriorityFeePerGas;
+        }
+
+
+        console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
+        , 2));
+
+        // Request signature and sending via wallet client using the sanitized object
+        result = await walletClient.sendTransaction(sanitizedTx);
         console.log(`Transaction sent for ${requestId}, hash: ${result}`);
 
       } else {
