@@ -231,9 +231,10 @@ function App() {
           ...(rawTx.value && { value: BigInt(rawTx.value) }),
           // Nonce can often be left as is if it's already a number, but converting from hex if needed:
           ...(rawTx.nonce && typeof rawTx.nonce === 'string' && { nonce: parseInt(rawTx.nonce, 16) }),
-          // Ensure 'from' and 'to' are correctly typed as Address (string)
+          // Ensure 'from' is correctly typed as Address (string)
           ...(rawTx.from && { from: rawTx.from as Address }),
-          ...(rawTx.to && { to: rawTx.to as Address }),
+          // Explicitly handle 'to': set to null if falsy (contract creation), otherwise set address
+          to: rawTx.to ? rawTx.to as Address : null,
           // Data should be a hex string `0x...`
           ...(rawTx.data && { data: rawTx.data as `0x${string}` }),
         };
