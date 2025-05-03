@@ -282,9 +282,24 @@ function App() {
 
           // Pass the sanitized object, ensuring 'to' is omitted or null as expected by the wallet
           // We previously deleted 'to' from sanitizedTx in this case.
+
+          // --- Convert BigInts back to Hex Strings for direct request ---
+          const txForRequest: Record<string, any> = {};
+          for (const key in sanitizedTx) {
+            const value = (sanitizedTx as any)[key];
+            if (typeof value === 'bigint') {
+              // Handle 0n specifically, otherwise convert to hex
+              txForRequest[key] = value === 0n ? '0x0' : `0x${value.toString(16)}`;
+            } else {
+              txForRequest[key] = value;
+            }
+          }
+          console.log(`[${requestId}] Transaction object prepared for transport request:`, JSON.stringify(txForRequest, null, 2));
+          // --- ---
+
           result = await request({
              method: 'eth_sendTransaction',
-             params: [sanitizedTx], // Pass the sanitized object
+             params: [txForRequest], // Pass the hex-converted object
           });
           console.log(`Contract creation transaction sent directly for ${requestId}, hash: ${result}`);
         } else {
