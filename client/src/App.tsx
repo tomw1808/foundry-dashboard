@@ -1,29 +1,31 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, usePublicClient } from 'wagmi'; // Import usePublicClient
-import { useEffect, useState } from 'react';
-import { Address } from 'viem'; // Import Address type
+import { useAccount, usePublicClient } from 'wagmi';
+import { useEffect, useState, useRef } from 'react'; // Import useRef
+import { Address } from 'viem';
 
 function App() {
   const { address, chainId, isConnected } = useAccount();
-  const publicClient = usePublicClient(); // Get the public client instance from Wagmi
-  const [ws, setWs] = useState<WebSocket | null>(null);
-  const [messages, setMessages] = useState<any[]>([]); // Store incoming messages
+  const publicClient = usePublicClient();
+  const wsRef = useRef<WebSocket | null>(null); // Use useRef for WebSocket instance
+  const [messages, setMessages] = useState<any[]>([]);
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting'); // State for display
 
   // --- WebSocket Connection ---
   useEffect(() => {
-    // Use the proxy path defined in vite.config.ts
-    // Ensure the protocol is ws:// or wss://
-    const wsUrl = `ws://${window.location.host}/socket`; // Use '/socket' or your chosen proxy path
+    const wsUrl = `ws://${window.location.host}/socket`;
     console.log('Attempting to connect WebSocket to:', wsUrl);
+    setWsStatus('connecting');
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
       console.log('WebSocket Connected');
-      setWs(socket);
+      wsRef.current = socket; // Store instance in ref
+      setWsStatus('open');
       socket.send(JSON.stringify({ type: 'clientHello', message: 'Frontend connected' }));
     };
 
     socket.onmessage = (event) => {
+      // Access the current WebSocket instance via wsRef.current inside the handler
       console.log('WebSocket Message Received:', event.data);
       try {
         const message = JSON.parse(event.data);
@@ -41,11 +43,14 @@ function App() {
 
     socket.onerror = (error) => {
       console.error('WebSocket Error:', error);
+      wsRef.current = null; // Clear ref on error
+      setWsStatus('error');
     };
 
     socket.onclose = () => {
       console.log('WebSocket Disconnected');
-      setWs(null);
+      wsRef.current = null; // Clear ref on close
+      setWsStatus('closed');
       // Optional: Implement reconnection logic here
     };
 
