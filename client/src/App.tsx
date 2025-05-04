@@ -289,7 +289,7 @@ function App() {
         }
         // Removed the redundant delete block for 'to' here
 
-        console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (key, value) =>
+        console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (_key, value) =>
             typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
         , 2));
 
