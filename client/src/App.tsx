@@ -9,6 +9,7 @@ type RpcPayload = { method: string; params: any[]; id: number | string; decoded?
 interface DecodedInfoBase {
     type: 'deployment' | 'functionCall';
     contractName: string;
+}
 // Define structure for a single decoded argument
 interface DecodedArg {
     name: string;

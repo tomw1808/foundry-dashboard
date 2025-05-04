@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-// Note: This script will be compiled to JS in the 'dist' folder.
-// Imports should work relative to the compiled location or use absolute paths/module resolution.
-
-#!/usr/bin/env node
-
 // Using require for compatibility with CommonJS output and older 'open' version
 import open from 'open'; // Use import with esModuleInterop
 import yargs from 'yargs';
