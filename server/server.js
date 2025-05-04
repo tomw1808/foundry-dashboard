@@ -131,24 +131,6 @@ app.post('/api/rpc', (req, res) => {
   // 4. IMPORTANT: Do not respond to the HTTP request yet!
   //    The response will be sent when the frontend replies via WebSocket.
 
-  // 1. Generate a unique request ID for tracking the response
-  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-  console.log(`   Forwarding request ${requestId} for method ${method} (Original ID: ${originalId}) to frontend.`);
-
-  // 2. Store the original response object (`res`) to reply later
-  pendingRequests.set(requestId, { res, originalId });
-  console.log(`   Request ${requestId} stored. Pending requests: ${pendingRequests.size}`);
-
-  // 3. Broadcast the request details to the frontend via WebSocket
-  broadcast({
-    type: 'rpcRequest',
-    requestId: requestId, // The ID the frontend should use to respond
-    payload: { method, params, id: originalId } // Send original RPC details
-  });
-
-  // 4. IMPORTANT: Do not respond to the HTTP request yet!
-  //    The response will be sent when the frontend replies via WebSocket.
-
   // Optional: Add a timeout to prevent requests from hanging indefinitely
   // Increase timeout for signing methods as user interaction takes time
   const TIMEOUT_MS = isSigningMethod ? 5 * 60 * 1000 : 60 * 1000; // 5 minutes for signing, 1 minute for RPC
