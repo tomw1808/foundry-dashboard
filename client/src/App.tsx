@@ -423,7 +423,7 @@ function App() {
                      {(request.payload.decoded.type === 'deployment' && request.payload.decoded.constructorArgs && request.payload.decoded.constructorArgs.length > 0 ||
                        request.payload.decoded.type === 'functionCall' && request.payload.decoded.args && request.payload.decoded.args.length > 0) && (
                        <pre className="whitespace-pre-wrap break-all text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
-                         {JSON.stringify(request.payload.decoded.type === 'deployment' ? request.payload.decoded.constructorArgs : request.payload.decoded.args, (key, value) =>
+                         {JSON.stringify(request.payload.decoded.type === 'deployment' ? request.payload.decoded.constructorArgs : request.payload.decoded.args, (_key, value) =>
                             typeof value === 'bigint' ? value.toString() : value // Convert BigInts for display
                          , 2)}
                        </pre>
