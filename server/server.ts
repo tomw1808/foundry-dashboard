@@ -216,35 +216,46 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
             try {
                 if (!tx.to) { // Contract Deployment
                     console.log(`[${originalId}] Attempting deployment decode for data: ${txData.substring(0, 40)}...`);
-                    const matchedArtifact = loadedArtifacts.find(
-                        artifact => artifact.bytecode && txData.startsWith(artifact.bytecode)
-                    );
 
-                    if (matchedArtifact) {
-                        console.log(`[${originalId}] Matched deployment bytecode for: ${matchedArtifact.name}`);
-                        const constructorAbi = matchedArtifact.abi.find(item => item.type === 'constructor');
+                    let longestMatch: LoadedArtifact | null = null;
+                    let maxMatchLength = 0;
+
+                    for (const artifact of loadedArtifacts) {
+                        // Ensure bytecode exists, is longer than just "0x", and is a prefix
+                        if (artifact.bytecode && artifact.bytecode.length > 2 && txData.startsWith(artifact.bytecode)) {
+                            if (artifact.bytecode.length > maxMatchLength) {
+                                maxMatchLength = artifact.bytecode.length;
+                                longestMatch = artifact;
+                            }
+                        }
+                    }
+
+                    if (longestMatch) {
+                        console.log(`[${originalId}] Matched longest deployment bytecode for: ${longestMatch.name}`);
+                        const constructorAbi = longestMatch.abi.find(item => item.type === 'constructor');
                         let constructorArgs: readonly unknown[] | string[] = []; // Allow readonly or string array
 
                         if (constructorAbi?.inputs && constructorAbi.inputs.length > 0) {
-                            const bytecodeLength = matchedArtifact.bytecode?.length ?? 0;
+                            // Use the length of the *longest match's* bytecode
+                            const bytecodeLength = longestMatch.bytecode?.length ?? 0;
                             const argsData = `0x${txData.slice(bytecodeLength)}` as Hex;
                             if (argsData.length > 2) { // Check if there's actual arg data
                                 try {
                                      constructorArgs = decodeAbiParameters(constructorAbi.inputs, argsData);
-                                     console.log(`[${originalId}] Decoded constructor args:`, constructorArgs);
+                                     console.log(`[${originalId}] Decoded constructor args for ${longestMatch.name}:`, constructorArgs);
                                 } catch (decodeErr) {
-                                     console.warn(`[${originalId}] Failed to decode constructor args for ${matchedArtifact.name}:`, decodeErr);
+                                     console.warn(`[${originalId}] Failed to decode constructor args for ${longestMatch.name}:`, decodeErr);
                                      constructorArgs = ['<decoding failed>'];
                                 }
                             } else {
-                                 console.log(`[${originalId}] No constructor args data found.`);
+                                 console.log(`[${originalId}] No constructor args data found for ${longestMatch.name}.`);
                             }
                         } else {
-                             console.log(`[${originalId}] No constructor found or no inputs defined for ${matchedArtifact.name}.`);
+                             console.log(`[${originalId}] No constructor found or no inputs defined for ${longestMatch.name}.`);
                         }
                         decodedInfo = {
                             type: 'deployment',
-                            contractName: matchedArtifact.name,
+                            contractName: longestMatch.name,
                             constructorArgs: constructorArgs,
                         };
                     } else {
