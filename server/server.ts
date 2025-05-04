@@ -1,8 +1,16 @@
 import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import path from 'path';
-import WebSocket, { WebSocketServer } from 'ws'; // Import WebSocketServer type
+import fs from 'fs/promises'; // Use promises version of fs
+import WebSocket, { WebSocketServer } from 'ws';
 import cors from 'cors';
+import {
+    Abi,
+    Hex,
+    decodeAbiParameters,
+    decodeFunctionData,
+    parseAbiItem, // Helper for constructor decoding if needed
+} from 'viem'; // Import viem functions
 
 const app = express();
 const server = http.createServer(app);
@@ -13,13 +21,29 @@ interface PendingRequest {
     res: Response;
     originalId: number | string;
     method: string;
-    timeoutId?: NodeJS.Timeout; // Optional timeout ID
+    timeoutId?: NodeJS.Timeout;
 }
+
+// Define type for loaded artifact data
+interface LoadedArtifact {
+    name: string;
+    path: string; // Original path for reference
+    abi: Abi;
+    bytecode: Hex | undefined; // Creation bytecode (bytecode.object)
+}
+
+// Store loaded artifacts
+let loadedArtifacts: LoadedArtifact[] = [];
 
 // Store pending RPC requests: Map<requestId, PendingRequest>
 const pendingRequests = new Map<string, PendingRequest>();
 
-const PORT: number = parseInt(process.env.PORT || '3001', 10); // Ensure PORT is number
+// --- Configuration ---
+// TODO: Make project path configurable via CLI args
+const projectPath = process.cwd(); // Default to current working directory
+const artifactsOutDir = path.join(projectPath, 'out'); // Default artifacts dir
+
+const PORT: number = parseInt(process.env.PORT || '3001', 10);
 
 // --- Middleware ---
 app.use(cors()); // Enable CORS for all origins (adjust for production later if needed)
@@ -103,6 +127,49 @@ function broadcast(message: any): void { // Add type for message and return type
     });
 }
 
+// --- Artifact Loading ---
+async function loadArtifacts(dir: string): Promise<LoadedArtifact[]> {
+    console.log(`Loading artifacts from: ${dir}`);
+    const artifacts: LoadedArtifact[] = [];
+    try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                // Recursively search subdirectories (like Contract.sol/)
+                artifacts.push(...await loadArtifacts(fullPath));
+            } else if (entry.isFile() && entry.name.endsWith('.json')) {
+                // Found a JSON file, attempt to parse as artifact
+                try {
+                    const content = await fs.readFile(fullPath, 'utf-8');
+                    const json = JSON.parse(content);
+                    // Basic validation: Check for abi and bytecode.object
+                    if (json.abi && Array.isArray(json.abi) && json.bytecode?.object) {
+                        const contractName = path.basename(entry.name, '.json'); // Extract name
+                        artifacts.push({
+                            name: contractName,
+                            path: fullPath,
+                            abi: json.abi as Abi,
+                            bytecode: json.bytecode.object as Hex,
+                        });
+                        console.log(`  Loaded artifact: ${contractName}`);
+                    }
+                } catch (parseError) {
+                    console.warn(`  Skipping non-artifact JSON or parse error: ${fullPath}`, parseError);
+                }
+            }
+        }
+    } catch (err: any) {
+        if (err.code === 'ENOENT') {
+            console.warn(`Artifact directory not found: ${dir}. Decoding will be unavailable.`);
+        } else {
+            console.error(`Error reading artifact directory ${dir}:`, err);
+        }
+    }
+    return artifacts;
+}
+
+
 // Example: Broadcast a message every 10 seconds
 // setInterval(() => {
 //   broadcast({ type: 'ping', timestamp: Date.now() });
@@ -136,7 +203,82 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
     // Determine if it's a signing method or a regular RPC call
     const isSigningMethod = signingMethods.includes(method);
     const requestType = isSigningMethod ? 'signRequest' : 'rpcRequest';
-    const responseType = isSigningMethod ? 'signResponse' : 'rpcResponse'; // Expected response type
+    const responseType = isSigningMethod ? 'signResponse' : 'rpcResponse';
+
+    // --- Attempt to Decode Transaction Data if Signing ---
+    let decodedInfo: any = null; // Holds decoding result
+    if (isSigningMethod && method === 'eth_sendTransaction' && params?.[0]) {
+        const tx = params[0] as any; // Transaction object
+        const txData = tx.data || tx.input; // Get data/input field
+
+        if (txData && txData !== '0x') {
+            try {
+                if (!tx.to) { // Contract Deployment
+                    console.log(`[${originalId}] Attempting deployment decode for data: ${txData.substring(0, 40)}...`);
+                    const matchedArtifact = loadedArtifacts.find(
+                        artifact => artifact.bytecode && txData.startsWith(artifact.bytecode)
+                    );
+
+                    if (matchedArtifact) {
+                        console.log(`[${originalId}] Matched deployment bytecode for: ${matchedArtifact.name}`);
+                        const constructorAbi = matchedArtifact.abi.find(item => item.type === 'constructor');
+                        let constructorArgs: any[] = [];
+
+                        if (constructorAbi?.inputs && constructorAbi.inputs.length > 0) {
+                            const bytecodeLength = matchedArtifact.bytecode?.length ?? 0;
+                            const argsData = `0x${txData.slice(bytecodeLength)}` as Hex;
+                            if (argsData.length > 2) { // Check if there's actual arg data
+                                try {
+                                     constructorArgs = decodeAbiParameters(constructorAbi.inputs, argsData);
+                                     console.log(`[${originalId}] Decoded constructor args:`, constructorArgs);
+                                } catch (decodeErr) {
+                                     console.warn(`[${originalId}] Failed to decode constructor args for ${matchedArtifact.name}:`, decodeErr);
+                                     constructorArgs = ['<decoding failed>'];
+                                }
+                            } else {
+                                 console.log(`[${originalId}] No constructor args data found.`);
+                            }
+                        } else {
+                             console.log(`[${originalId}] No constructor found or no inputs defined for ${matchedArtifact.name}.`);
+                        }
+                        decodedInfo = {
+                            type: 'deployment',
+                            contractName: matchedArtifact.name,
+                            constructorArgs: constructorArgs,
+                        };
+                    } else {
+                        console.log(`[${originalId}] No matching bytecode found for deployment.`);
+                    }
+                } else { // Function Call
+                    console.log(`[${originalId}] Attempting function call decode for data: ${txData.substring(0, 10)}...`);
+                    let foundMatch = false;
+                    for (const artifact of loadedArtifacts) {
+                        try {
+                            const decoded = decodeFunctionData({ abi: artifact.abi, data: txData });
+                            console.log(`[${originalId}] Matched function call: ${artifact.name}.${decoded.functionName}`);
+                            decodedInfo = {
+                                type: 'functionCall',
+                                contractName: artifact.name,
+                                functionName: decoded.functionName,
+                                args: decoded.args ?? [], // Ensure args is an array
+                            };
+                            foundMatch = true;
+                            break; // Stop on first match
+                        } catch (e) {
+                            // Ignore errors (usually "Function not found" or ABI mismatch)
+                        }
+                    }
+                    if (!foundMatch) {
+                         console.log(`[${originalId}] No matching function signature found in loaded ABIs.`);
+                    }
+                }
+            } catch (err) {
+                console.error(`[${originalId}] Error during transaction decoding:`, err);
+            }
+        }
+    }
+    // --- End Decoding ---
+
 
     // 1. Generate a unique request ID for tracking the response
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -149,9 +291,14 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
 
     // 3. Broadcast the request details to the frontend via WebSocket
     broadcast({
-        type: requestType, // Use 'signRequest' or 'rpcRequest'
-        requestId: requestId, // The ID the frontend should use to respond
-        payload: { method, params, id: originalId } // Send original RPC details
+        type: requestType,
+        requestId: requestId,
+        payload: {
+            method,
+            params,
+            id: originalId,
+            decoded: decodedInfo // Include decoding result
+        }
     });
 
     // 4. IMPORTANT: Do not respond to the HTTP request yet!
@@ -238,8 +385,15 @@ export { app, server, wss, broadcast };
 // --- Allow running server directly ---
 // Check if this module is the main module being run
 if (require.main === module) {
-    startServer().catch(err => {
-        console.error("Server failed to start:", err);
-        process.exit(1);
-    });
+    // Load artifacts before starting the server
+    loadArtifacts(artifactsOutDir)
+        .then(artifacts => {
+            loadedArtifacts = artifacts;
+            console.log(`Successfully loaded ${loadedArtifacts.length} artifacts.`);
+            return startServer(); // Start server after loading
+        })
+        .catch(err => {
+            console.error("Server failed to start due to artifact loading or server error:", err);
+            process.exit(1);
+        });
 }
