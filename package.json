@@ -2,34 +2,42 @@
   "name": "forge-dashboard",
   "version": "0.1.0",
   "description": "A local dashboard for interacting with Foundry projects via browser wallets.",
-  "main": "server/server.js",
+  "main": "dist/server/server.js", // Point to compiled JS output
   "bin": {
-    "forge-dashboard": "./bin/forge-dashboard.js"
+    "forge-dashboard": "./dist/bin/forge-dashboard.js" // Point to compiled JS output
   },
   "scripts": {
-    "server": "node server/server.js",
-    "server:dev": "nodemon server/server.js",
+    "server": "node dist/server/server.js", // Run compiled JS
+    "server:dev": "tsx watch server/server.ts", // Use tsx for hot-reloading TS
     "client:dev": "cd client && npm run dev",
     "dev": "concurrently \"npm:server:dev\" \"npm:client:dev\"",
     "build:client": "cd client && npm run build",
-    "build": "npm run build:client",
-    "start": "node ./bin/forge-dashboard.js",
-    "prestart": "npm run build"
+    "build:server": "tsc -p tsconfig.server.json", // Compile server TS
+    "build": "npm run build:client && npm run build:server", // Build both
+    "start": "node ./dist/bin/forge-dashboard.js", // Run compiled bin script
+    "prestart": "npm run build",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit" // Add typechecking script
   },
   "files": [
-    "bin/",
-    "server/",
+    "dist/", // Include the compiled output directory
     "client/dist/"
   ],
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.19.2", 
-    "open": "^10.1.2",
+    "express": "^4.19.2",
+    "open": "^8.4.0", // Use v8 for CommonJS compatibility if bin script stays CJS, or update bin script
     "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.13", // Use Node LTS version types
+    "@types/open": "^6.0.0", // Types for 'open' v8
+    "@types/ws": "^8.5.11",
     "concurrently": "^9.1.2",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10", // Keep nodemon if preferred, but tsx watch is often sufficient
+    "tsx": "^4.16.2", // Tool to run TS files directly
+    "typescript": "^5.5.4" // Add TypeScript
   },
   "engines": {
     "node": ">=16"
