@@ -241,14 +241,22 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                             const argsData = `0x${txData.slice(bytecodeLength)}` as Hex;
                             if (argsData.length > 2) { // Check if there's actual arg data
                                 try {
-                                     constructorArgs = decodeAbiParameters(constructorAbi.inputs, argsData);
-                                     console.log(`[${originalId}] Decoded constructor args for ${longestMatch.name}:`, constructorArgs);
+                                try {
+                                    const decodedValues = decodeAbiParameters(constructorAbi.inputs, argsData);
+                                    // Map values to names from ABI inputs
+                                    constructorArgs = constructorAbi.inputs.map((input, index) => ({
+                                        name: input.name || `arg${index}`, // Use index if name is missing
+                                        type: input.type,
+                                        value: decodedValues[index],
+                                    }));
+                                    console.log(`[${originalId}] Decoded constructor args for ${longestMatch.name}:`, constructorArgs);
                                 } catch (decodeErr) {
-                                     console.warn(`[${originalId}] Failed to decode constructor args for ${longestMatch.name}:`, decodeErr);
-                                     constructorArgs = ['<decoding failed>'];
+                                    console.warn(`[${originalId}] Failed to decode constructor args for ${longestMatch.name}:`, decodeErr);
+                                    // Keep constructorArgs as an empty array or indicate failure differently if needed
+                                    constructorArgs = [{ name: 'Error', type: 'unknown', value: '<decoding failed>' }];
                                 }
                             } else {
-                                 console.log(`[${originalId}] No constructor args data found for ${longestMatch.name}.`);
+                                console.log(`[${originalId}] No constructor args data found for ${longestMatch.name}.`);
                             }
                         } else {
                              console.log(`[${originalId}] No constructor found or no inputs defined for ${longestMatch.name}.`);
@@ -266,13 +274,31 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                     let foundMatch = false;
                     for (const artifact of loadedArtifacts) {
                         try {
-                            const decoded = decodeFunctionData({ abi: artifact.abi, data: txData });
-                            console.log(`[${originalId}] Matched function call: ${artifact.name}.${decoded.functionName}`);
+                            const { functionName, args } = decodeFunctionData({ abi: artifact.abi, data: txData as Hex });
+                            console.log(`[${originalId}] Matched function call: ${artifact.name}.${functionName}`);
+
+                            // Find the function ABI item to get input names and types
+                            const functionAbi = artifact.abi.find(
+                                item => item.type === 'function' && item.name === functionName
+                            );
+
+                            let formattedArgs: any[] = [];
+                            if (functionAbi?.inputs && args) {
+                                formattedArgs = functionAbi.inputs.map((input, index) => ({
+                                    name: input.name || `arg${index}`,
+                                    type: input.type,
+                                    value: args[index],
+                                }));
+                            } else {
+                                // Handle case where args might exist but ABI inputs don't match (shouldn't happen often)
+                                formattedArgs = args?.map((arg, index) => ({ name: `arg${index}`, type: 'unknown', value: arg })) ?? [];
+                            }
+
                             decodedInfo = {
                                 type: 'functionCall',
                                 contractName: artifact.name,
-                                functionName: decoded.functionName,
-                                args: decoded.args ?? [], // Ensure args is an array
+                                functionName: functionName,
+                                args: formattedArgs, // Send formatted args
                             };
                             foundMatch = true;
                             break; // Stop on first match

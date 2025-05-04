@@ -9,15 +9,22 @@ type RpcPayload = { method: string; params: any[]; id: number | string; decoded?
 interface DecodedInfoBase {
     type: 'deployment' | 'functionCall';
     contractName: string;
+// Define structure for a single decoded argument
+interface DecodedArg {
+    name: string;
+    type: string;
+    value: any;
+}
+
 }
 interface DecodedDeploymentInfo extends DecodedInfoBase {
     type: 'deployment';
-    constructorArgs?: any[];
+    constructorArgs?: DecodedArg[]; // Now an array of DecodedArg
 }
 interface DecodedFunctionInfo extends DecodedInfoBase {
     type: 'functionCall';
     functionName: string;
-    args?: any[];
+    args?: DecodedArg[]; // Now an array of DecodedArg
 }
 type DecodedInfo = DecodedDeploymentInfo | DecodedFunctionInfo;
 
@@ -420,13 +427,26 @@ function App() {
                       </>
                     )}
                      {/* Common area for displaying args */}
-                     {(request.payload.decoded.type === 'deployment' && request.payload.decoded.constructorArgs && request.payload.decoded.constructorArgs.length > 0 ||
-                       request.payload.decoded.type === 'functionCall' && request.payload.decoded.args && request.payload.decoded.args.length > 0) && (
-                       <pre className="whitespace-pre-wrap break-all text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
-                         {JSON.stringify(request.payload.decoded.type === 'deployment' ? request.payload.decoded.constructorArgs : request.payload.decoded.args, (_key, value) =>
-                            typeof value === 'bigint' ? value.toString() : value // Convert BigInts for display
-                         , 2)}
-                       </pre>
+                     {/* Common area for displaying args */}
+                     {(request.payload.decoded.type === 'deployment' && request.payload.decoded.constructorArgs && request.payload.decoded.constructorArgs.length > 0) && (
+                        <div className="text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
+                            {request.payload.decoded.constructorArgs.map((arg, index) => (
+                                <div key={index} className="mb-1">
+                                    <span className="font-semibold text-gray-300">{arg.name}</span> (<span className="italic text-gray-400">{arg.type}</span>):
+                                    <pre className="inline whitespace-pre-wrap break-all ml-1">{JSON.stringify(arg.value, (_, val) => typeof val === 'bigint' ? val.toString() : val, 2)}</pre>
+                                </div>
+                            ))}
+                        </div>
+                     )}
+                      {(request.payload.decoded.type === 'functionCall' && request.payload.decoded.args && request.payload.decoded.args.length > 0) && (
+                        <div className="text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
+                            {request.payload.decoded.args.map((arg, index) => (
+                                <div key={index} className="mb-1">
+                                    <span className="font-semibold text-gray-300">{arg.name}</span> (<span className="italic text-gray-400">{arg.type}</span>):
+                                    <pre className="inline whitespace-pre-wrap break-all ml-1">{JSON.stringify(arg.value, (_, val) => typeof val === 'bigint' ? val.toString() : val, 2)}</pre>
+                                </div>
+                            ))}
+                        </div>
                      )}
                   </div>
                 ) : (
