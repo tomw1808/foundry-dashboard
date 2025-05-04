@@ -223,7 +223,7 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                     if (matchedArtifact) {
                         console.log(`[${originalId}] Matched deployment bytecode for: ${matchedArtifact.name}`);
                         const constructorAbi = matchedArtifact.abi.find(item => item.type === 'constructor');
-                        let constructorArgs: any[] = [];
+                        let constructorArgs: readonly unknown[] | string[] = []; // Allow readonly or string array
 
                         if (constructorAbi?.inputs && constructorAbi.inputs.length > 0) {
                             const bytecodeLength = matchedArtifact.bytecode?.length ?? 0;
