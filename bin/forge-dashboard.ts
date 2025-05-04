@@ -23,8 +23,13 @@ async function main() {
             alias: 'd', // Directory
             type: 'string',
             description: 'Path to the Foundry project root directory',
-            default: process.cwd(), // Default to current working directory
-            coerce: (p) => path.resolve(p) // Ensure path is absolute
+            default: process.cwd(),
+            coerce: (p) => path.resolve(p)
+        })
+        .option('verbose', {
+            alias: 'v',
+            type: 'count', // Count occurrences of -v flag
+            description: 'Increase logging verbosity (-v, -vv, -vvv)'
         })
         .help()
         .alias('help', 'h')
@@ -32,15 +37,19 @@ async function main() {
 
     const port = argv.port;
     const projectPath = argv.path;
+    const verbosity = argv.verbose; // Get verbosity count
 
+    // Initial log before logger is fully configured in server
+    console.log(`Verbosity level: ${verbosity}`);
     console.log(`Using project path: ${projectPath}`);
     console.log(`Attempting to start server on port: ${port}`);
     // --- End Argument Parsing ---
 
     try {
-        // Pass projectPath to startServer
-        const actualPort: number = await startServer(port, projectPath);
+        // Pass projectPath and verbosity to startServer
+        const actualPort: number = await startServer(port, projectPath, verbosity);
         const url = `http://localhost:${actualPort}`;
+        // Use console.log here as logger isn't available in this scope easily
         console.log(`Forge Dashboard server started. Opening dashboard at ${url}`);
 
         // Open the URL in the default browser

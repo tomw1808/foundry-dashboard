@@ -36,9 +36,10 @@ function App() {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient(); // Get wallet client for signing
   const wsRef = useRef<WebSocket | null>(null);
-  const [messages, setMessages] = useState<any[]>([]); // Log of all messages
-  const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]); // State for signing requests
+  // const [messages, setMessages] = useState<any[]>([]); // Keep log minimal now
+  const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
+  const [processedRequests, setProcessedRequests] = useState(0); // Counter
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -56,16 +57,18 @@ function App() {
 
     socket.onmessage = (event) => {
       // Access the current WebSocket instance via wsRef.current inside the handler
-      console.log('WebSocket Message Received:', event.data);
+      // console.log('WebSocket Message Received:', event.data); // Reduce noise
       try {
         const message = JSON.parse(event.data);
-        setMessages((prev) => [...prev, message]); // Add message to state
+        // setMessages((prev) => [...prev, message]); // Don't store every message
 
         // Handle incoming requests from backend
         if (message.type === 'rpcRequest') {
+          // Log only the request type, not full payload by default
+          console.log(`Received rpcRequest for method: ${message.payload?.method} (ID: ${message.requestId})`);
           handleRpcRequest(message.requestId, message.payload);
         } else if (message.type === 'signRequest') {
-          console.log('Received signRequest:', message);
+          console.log('Received signRequest:', message.requestId, message.payload?.method); // Log key info
           // Add to pending requests state if not already present
           setPendingSignRequests((prev) =>
              prev.find((req) => req.requestId === message.requestId)
@@ -104,7 +107,7 @@ function App() {
     const currentWs = wsRef.current;
     // --- ---
 
-    console.log(`Handling RPC Request ${requestId}:`, payload);
+    // console.log(`Handling RPC Request ${requestId}:`, payload); // Reduce noise
 
     // Ensure wallet is connected, publicClient is available, AND WebSocket is open
     if (!isConnected || !address || !chainId || !publicClient || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
@@ -191,6 +194,7 @@ function App() {
         sendRpcResponse(currentWs, requestId, { error });
       } else {
         sendRpcResponse(currentWs, requestId, { result });
+        setProcessedRequests(count => count + 1); // Increment counter on success
       }
 
     } catch (err: any) {
@@ -210,8 +214,8 @@ function App() {
         requestId: requestId, // Use the requestId passed to this function
         ...response,
       });
-      console.log(`Sending RPC Response for ${requestId}:`, message);
-      socketInstance.send(message); // Use the passed instance
+      // console.log(`Sending RPC Response for ${requestId}:`, message); // Reduce noise
+      socketInstance.send(message);
     } else {
       // Log based on the state of the passed instance
       console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send response for ${requestId}`);
@@ -223,7 +227,7 @@ function App() {
     const { requestId, payload } = request;
     const currentWs = wsRef.current;
 
-    console.log(`Attempting to sign request ${requestId}:`, payload);
+    console.log(`Attempting to sign request ${requestId} for method ${payload.method}`); // Log less verbosely
 
     if (!walletClient || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
       const reason = !walletClient ? 'Wallet client not available' : 'WebSocket not open';
@@ -296,14 +300,14 @@ function App() {
         }
         // Removed the redundant delete block for 'to' here
 
-        console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (_key, value) =>
-            typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
-        , 2));
+        // console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (_key, value) =>
+        //     typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
+        // , 2)); // Reduce noise
 
         // Always use viem's walletClient now
-        console.log(`[${requestId}] Using walletClient.sendTransaction...`);
+        console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
         result = await walletClient.sendTransaction(sanitizedTx);
-        console.log(`Transaction sent via walletClient for ${requestId}, hash: ${result}`);
+        console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
 
       } else {
          // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
@@ -320,6 +324,7 @@ function App() {
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
       // Send success response back
       sendSignResponse(currentWs, requestId, { result });
+      setProcessedRequests(count => count + 1); // Increment counter on success
 
     } catch (err: any) {
       // Remove the request from the UI *before* sending the error response
@@ -358,7 +363,7 @@ function App() {
         requestId: requestId,
         ...response,
       });
-      console.log(`Sending Sign Response for ${requestId}:`, message);
+      // console.log(`Sending Sign Response for ${requestId}:`, message); // Reduce noise
       socketInstance.send(message);
     } else {
       console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send sign response for ${requestId}`);
@@ -387,6 +392,7 @@ function App() {
             <>
               <p>Address: <span className="font-mono text-sm">{address}</span></p>
               <p>Chain ID: {chainId}</p>
+              <p>Processed Requests: {processedRequests}</p> {/* Display counter */}
             </>
           )}
         </div>
@@ -479,14 +485,14 @@ function App() {
           </div>
         )}
 
-        {/* Section for Message Log */}
-        <h3 className="text-lg mt-6 mb-2">Message Log</h3>
+        {/* Section for Message Log (Removed for brevity, could be added back conditionally) */}
+        {/* <h3 className="text-lg mt-6 mb-2">Message Log</h3>
         <div className="h-64 overflow-y-auto bg-gray-700 p-2 rounded font-mono text-xs">
           {messages.length === 0 && <p>No messages received yet.</p>}
           {messages.slice().reverse().map((msg, index) => ( // Show newest first
             <pre key={messages.length - index -1} className="whitespace-pre-wrap break-all mb-1 p-1 bg-gray-600 rounded">{JSON.stringify(msg, null, 2)}</pre>
           ))}
-        </div>
+        </div> */}
       </main>
     </div>
   )

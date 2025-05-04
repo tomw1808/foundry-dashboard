@@ -9,12 +9,17 @@ import {
     Hex,
     decodeAbiParameters,
     decodeFunctionData,
-    parseAbiItem, // Helper for constructor decoding if needed
-} from 'viem'; // Import viem functions
+    parseAbiItem,
+} from 'viem';
+import pino, { Logger } from 'pino'; // Import pino and Logger type
+
+// --- Logger Setup ---
+// Placeholder logger, will be configured in startServer
+let logger: Logger = pino({ level: 'info' });
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server }); // Use WebSocketServer type
+const wss = new WebSocketServer({ server });
 
 // Define a type for the pending request data
 interface PendingRequest {
@@ -48,26 +53,26 @@ app.use(cors()); // Enable CORS for all origins (adjust for production later if 
 app.use(express.json()); // Parse JSON request bodies
 
 // --- WebSocket Handling ---
-wss.on('connection', (ws: WebSocket) => { // Add type for ws
-    console.log('Client connected via WebSocket');
+wss.on('connection', (ws: WebSocket) => {
+    logger.info('Client connected via WebSocket');
 
-    ws.on('message', (rawMessage: Buffer | ArrayBuffer | Buffer[]) => { // Add type for rawMessage
+    ws.on('message', (rawMessage: Buffer | ArrayBuffer | Buffer[]) => {
         const messageString = rawMessage.toString();
-        console.log('Received message from client:', messageString);
+        logger.trace({ msg: messageString }, 'Received message from client'); // Use trace for raw messages
         try {
-            const message: any = JSON.parse(messageString); // Keep 'any' for flexibility or define stricter types
+            const message: any = JSON.parse(messageString);
 
             // Check if it's a response to a pending request (RPC or Signing)
             if ((message.type === 'rpcResponse' || message.type === 'signResponse') && message.requestId) {
                 const pending = pendingRequests.get(message.requestId);
 
                 if (pending) {
-                    console.log(`Received ${message.type} for pending request: ${message.requestId} (Method: ${pending.method})`);
+                    logger.debug(`Received ${message.type} for pending request: ${message.requestId} (Method: ${pending.method})`);
 
                     // --- Clear the timeout ---
                     if (pending.timeoutId) {
                         clearTimeout(pending.timeoutId);
-                        console.log(`Cleared timeout for request ${message.requestId}`);
+                        logger.debug(`Cleared timeout for request ${message.requestId}`);
                     }
                     // --- ---
 
@@ -84,31 +89,36 @@ wss.on('connection', (ws: WebSocket) => { // Add type for ws
 
                     // Remove the request from the pending map
                     pendingRequests.delete(message.requestId);
-                    console.log(`Completed and removed request: ${message.requestId}. Pending: ${pendingRequests.size}`);
+                    logger.debug(`Completed and removed request: ${message.requestId}. Pending: ${pendingRequests.size}`);
 
                 } else {
-                    console.warn(`Received response for unknown or already completed request ID: ${message.requestId}`);
+                    logger.warn(`Received response for unknown or already completed request ID: ${message.requestId}`);
                 }
             } else {
                 // Handle other message types if needed
-                console.log('Received non-rpcResponse/non-signResponse message or message without requestId:', message);
-                // Example echo for other messages
-                ws.send(JSON.stringify({ type: 'echo', payload: message }));
+                logger.trace({ message }, 'Received non-response message or message without requestId');
+                // Example echo for other messages - maybe only on higher verbosity?
+                if (logger.isLevelEnabled('trace')) {
+                    ws.send(JSON.stringify({ type: 'echo', payload: message }));
+                }
             }
 
         } catch (e) {
-            console.error('Failed to parse message or handle response:', e);
-            ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON received or processing error' }));
+            logger.error({ err: e }, 'Failed to parse message or handle response');
+            // Avoid sending response if ws is closing/closed
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON received or processing error' }));
+            }
         }
     });
 
     ws.on('close', () => {
-        console.log('Client disconnected');
+        logger.info('Client disconnected');
         // Optional: Clean up any pending requests associated with this specific client if needed
     });
 
-    ws.on('error', (error: Error) => { // Add type for error
-        console.error('WebSocket error:', error);
+    ws.on('error', (error: Error) => {
+        logger.error({ err: error }, 'WebSocket error');
     });
 
     // Send a welcome message
@@ -128,7 +138,7 @@ function broadcast(message: any): void { // Add type for message and return type
 // --- Artifact Loading ---
 // Takes the determined artifacts directory path
 async function loadArtifacts(artifactsDir: string): Promise<LoadedArtifact[]> {
-    console.log(`Loading artifacts from: ${artifactsDir}`);
+    logger.info(`Loading artifacts from: ${artifactsDir}`);
     const artifacts: LoadedArtifact[] = [];
     try {
         // Check if directory exists before reading
@@ -153,18 +163,18 @@ async function loadArtifacts(artifactsDir: string): Promise<LoadedArtifact[]> {
                             abi: json.abi as Abi,
                             bytecode: json.bytecode.object as Hex,
                         });
-                        console.log(`  Loaded artifact: ${contractName}`);
+                        logger.debug(`  Loaded artifact: ${contractName}`);
                     }
                 } catch (parseError) {
-                    console.warn(`  Skipping non-artifact JSON or parse error: ${fullPath}`, parseError);
+                    logger.warn({ err: parseError, path: fullPath }, `Skipping non-artifact JSON or parse error`);
                 }
             }
         }
     } catch (err: any) {
         if (err.code === 'ENOENT') {
-            console.warn(`Artifact directory not found: ${artifactsDir}. Decoding will be unavailable.`);
+            logger.warn(`Artifact directory not found: ${artifactsDir}. Decoding will be unavailable.`);
         } else {
-            console.error(`Error reading artifact directory ${artifactsDir}:`, err);
+            logger.error({ err: err, dir: artifactsDir }, `Error reading artifact directory`);
         }
     }
     return artifacts;
@@ -185,9 +195,11 @@ interface RpcRequestBody {
     id: number | string;
 }
 
-app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => { // Add types for req, res
+app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => {
     const { method, params, id: originalId } = req.body;
-    console.log(`Received RPC call: ${method}, ID: ${originalId}`, params);
+    // Log basic info at info level, details at debug/trace
+    logger.info(`RPC <-- ${method} (ID: ${originalId})`);
+    logger.debug({ params }, `Params for ${method} (ID: ${originalId})`);
 
     // List of methods that require signing
     const signingMethods: string[] = [
@@ -213,9 +225,10 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
         const txData = tx.data || tx.input; // Get data/input field
 
         if (txData && txData !== '0x') {
+            logger.debug(`[${originalId}] Attempting to decode transaction data...`);
             try {
                 if (!tx.to) { // Contract Deployment
-                    console.log(`[${originalId}] Attempting deployment decode for data: ${txData.substring(0, 40)}...`);
+                    logger.debug(`[${originalId}] Attempting deployment decode for data: ${txData.substring(0, 40)}...`);
 
                     let longestMatch: LoadedArtifact | null = null;
                     let maxMatchLength = 0;
@@ -231,11 +244,12 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                     }
 
                     if (longestMatch) {
-                        console.log(`[${originalId}] Matched longest deployment bytecode for: ${longestMatch.name}`);
+                        logger.debug(`[${originalId}] Matched longest deployment bytecode for: ${longestMatch.name}`);
                         const constructorAbi = longestMatch.abi.find(item => item.type === 'constructor');
-                        let constructorArgs: readonly unknown[] | string[] = []; // Allow readonly or string array
+                        let constructorArgs: any[] | readonly unknown[] = []; // Adjusted type slightly
 
                         if (constructorAbi?.inputs && constructorAbi.inputs.length > 0) {
+                            logger.debug(`[${originalId}] Found constructor ABI for ${longestMatch.name}`);
                             // Use the length of the *longest match's* bytecode
                             const bytecodeLength = longestMatch.bytecode?.length ?? 0;
                             const argsData = `0x${txData.slice(bytecodeLength)}` as Hex;
@@ -249,17 +263,16 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                                         type: input.type,
                                         value: decodedValues[index],
                                     }));
-                                    console.log(`[${originalId}] Decoded constructor args for ${longestMatch.name}:`, constructorArgs);
+                                    logger.debug({ args: constructorArgs }, `[${originalId}] Decoded constructor args for ${longestMatch.name}`);
                                 } catch (decodeErr) {
-                                    console.warn(`[${originalId}] Failed to decode constructor args for ${longestMatch.name}:`, decodeErr);
-                                    // Keep constructorArgs as an empty array or indicate failure differently if needed
+                                    logger.warn({ err: decodeErr }, `[${originalId}] Failed to decode constructor args for ${longestMatch.name}`);
                                     constructorArgs = [{ name: 'Error', type: 'unknown', value: '<decoding failed>' }];
                                 }
                             } else {
-                                console.log(`[${originalId}] No constructor args data found for ${longestMatch.name}.`);
+                                logger.debug(`[${originalId}] No constructor args data found for ${longestMatch.name}.`);
                             }
                         } else {
-                             console.log(`[${originalId}] No constructor found or no inputs defined for ${longestMatch.name}.`);
+                             logger.debug(`[${originalId}] No constructor found or no inputs defined for ${longestMatch.name}.`);
                         }
                         decodedInfo = {
                             type: 'deployment',
@@ -267,15 +280,16 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                             constructorArgs: constructorArgs,
                         };
                     } else {
-                        console.log(`[${originalId}] No matching bytecode found for deployment.`);
+                        logger.debug(`[${originalId}] No matching bytecode found for deployment.`);
                     }
                 } else { // Function Call
-                    console.log(`[${originalId}] Attempting function call decode for data: ${txData.substring(0, 10)}...`);
+                    logger.debug(`[${originalId}] Attempting function call decode for data: ${txData.substring(0, 10)}...`);
                     let foundMatch = false;
                     for (const artifact of loadedArtifacts) {
                         try {
+                            // Note: decodeFunctionData throws if no match in the ABI
                             const { functionName, args } = decodeFunctionData({ abi: artifact.abi, data: txData as Hex });
-                            console.log(`[${originalId}] Matched function call: ${artifact.name}.${functionName}`);
+                            logger.debug(`[${originalId}] Matched function call: ${artifact.name}.${functionName}`);
 
                             // Find the function ABI item to get input names and types
                             const functionAbi = artifact.abi.find(
@@ -304,16 +318,19 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                             };
                             foundMatch = true;
                             break; // Stop on first match
-                        } catch (e) {
-                            // Ignore errors (usually "Function not found" or ABI mismatch)
+                        } catch (e: any) {
+                            // Ignore "FunctionNotFound" or similar errors, log others at trace level
+                            if (!e.message?.includes('FunctionNotFound')) {
+                                logger.trace({ err: e, artifact: artifact.name }, `Non-matching ABI or decode error during function search`);
+                            }
                         }
                     }
                     if (!foundMatch) {
-                         console.log(`[${originalId}] No matching function signature found in loaded ABIs.`);
+                         logger.debug(`[${originalId}] No matching function signature found in loaded ABIs.`);
                     }
                 }
             } catch (err) {
-                console.error(`[${originalId}] Error during transaction decoding:`, err);
+                logger.error({ err }, `[${originalId}] Error during transaction decoding`);
             }
         }
     }
@@ -322,12 +339,12 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
 
     // 1. Generate a unique request ID for tracking the response
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    console.log(`   ${isSigningMethod ? 'Intercepted' : 'Forwarding'} request ${requestId} for method ${method} (Original ID: ${originalId}) to frontend.`);
+    logger.debug(`Broadcasting ${requestType} ${requestId} for ${method} (Original ID: ${originalId}) to frontend.`);
 
     // 2. Store the original response object (`res`), original ID, and method
     const pendingData: PendingRequest = { res, originalId, method };
     pendingRequests.set(requestId, pendingData);
-    console.log(`   Request ${requestId} stored. Pending requests: ${pendingRequests.size}`);
+    logger.trace(`Request ${requestId} stored. Pending requests: ${pendingRequests.size}`);
 
     // 3. Broadcast the request details to the frontend via WebSocket
     broadcast({
@@ -348,22 +365,21 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
     // Increase timeout for signing methods as user interaction takes time
     const TIMEOUT_MS = isSigningMethod ? 5 * 60 * 1000 : 60 * 1000; // 5 minutes for signing, 1 minute for RPC
     const timeoutId = setTimeout(() => {
-        const timedOutRequest = pendingRequests.get(requestId); // Get details before potentially deleting
+        const timedOutRequest = pendingRequests.get(requestId);
         if (timedOutRequest) {
-            console.error(`Request ${requestId} (Method: ${timedOutRequest.method}, Original ID: ${timedOutRequest.originalId}) timed out after ${TIMEOUT_MS / 1000}s.`);
+            logger.warn(`Request ${requestId} (Method: ${timedOutRequest.method}, Original ID: ${timedOutRequest.originalId}) timed out after ${TIMEOUT_MS / 1000}s.`);
             // Send appropriate error back to forge script
-            // Check if response hasn't already been sent
             if (!timedOutRequest.res.headersSent) {
-                 timedOutRequest.res.status(504).json({ // Gateway Timeout
+                 timedOutRequest.res.status(504).json({
                     jsonrpc: '2.0',
                     error: { code: -32000, message: `Request timed out waiting for ${responseType} from frontend wallet for method '${timedOutRequest.method}'` },
                     id: timedOutRequest.originalId
                 });
             } else {
-                 console.warn(`Request ${requestId} timed out, but headers already sent.`);
+                 logger.warn(`Request ${requestId} timed out, but headers already sent.`);
             }
-            pendingRequests.delete(requestId); // Remove from map
-            console.log(`Removed timed out request: ${requestId}. Pending: ${pendingRequests.size}`);
+            pendingRequests.delete(requestId);
+            logger.debug(`Removed timed out request: ${requestId}. Pending: ${pendingRequests.size}`);
         }
     }, TIMEOUT_MS);
 
@@ -377,17 +393,17 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
 // Serve static files from the React app's build directory
 // Use path.resolve for potentially more robust path construction
 const clientBuildPath = path.resolve(__dirname, '../../client/dist'); // Adjust relative path from dist/server/server.js
-console.log(`Serving static files from: ${clientBuildPath}`); // Log path for debugging
+logger.info(`Serving static files from: ${clientBuildPath}`);
 app.use(express.static(clientBuildPath));
 
 // The "catchall" handler: for any request that doesn't match one above,
 // send back React's index.html file. This is needed for client-side routing.
-app.get('*', (req: Request, res: Response) => { // Add types
+app.get('*', (req: Request, res: Response) => {
     const indexPath = path.resolve(clientBuildPath, 'index.html');
     res.sendFile(indexPath, (err) => {
         if (err) {
-            console.error("Error sending index.html:", err);
-            // Avoid sending error response if headers already sent (e.g., by static middleware)
+            logger.error({ err }, "Error sending index.html");
+            // Avoid sending error response if headers already sent
             if (!res.headersSent) {
                  res.status(500).send("Error serving application.");
             }
@@ -397,19 +413,42 @@ app.get('*', (req: Request, res: Response) => { // Add types
 
 
 // --- Server startup logic ---
-// Accept port and projectPath
-export function startServer(portToUse: number = DEFAULT_PORT, projectDir: string): Promise<number> {
+// Accept port, projectPath, and verbosity
+export function startServer(portToUse: number = DEFAULT_PORT, projectDir: string, verbosity: number = 0): Promise<number> {
+
+    // --- Configure Logger based on verbosity ---
+    let logLevel = 'info';
+    if (verbosity === 1) logLevel = 'debug';
+    if (verbosity >= 2) logLevel = 'trace';
+
+    const pinoOptions: pino.LoggerOptions = { level: logLevel };
+    // Use pretty printing for development if verbosity is high or if TTY
+    if (verbosity >= 2 || (process.stdout.isTTY && process.env.NODE_ENV !== 'production')) {
+        pinoOptions.transport = {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                ignore: 'pid,hostname', // Optional: clean up output
+                translateTime: 'SYS:HH:MM:ss.l', // Optional: format time
+            },
+        };
+    }
+    logger = pino(pinoOptions); // Re-initialize the logger with correct level/transport
+    logger.info(`Logger initialized with level: ${logLevel}`);
+    // --- End Logger Configuration ---
+
+
     // Determine artifacts directory based on provided project path
     artifactsOutDir = path.join(projectDir, 'out'); // Assuming 'out' subdir
-    console.log(`Resolved artifacts directory: ${artifactsOutDir}`);
+    logger.info(`Resolved artifacts directory: ${artifactsOutDir}`);
 
-    return new Promise(async (resolve, reject) => { // Make promise async for await
+    return new Promise(async (resolve, reject) => {
         try {
             // Load artifacts before starting the server listener
-            loadedArtifacts = await loadArtifacts(artifactsOutDir);
-            console.log(`Successfully loaded ${loadedArtifacts.length} artifacts.`);
+            loadedArtifacts = await loadArtifacts(artifactsOutDir); // Uses the logger now
+            logger.info(`Successfully loaded ${loadedArtifacts.length} artifacts.`);
 
-            server.listen(portToUse, () => { // Use server.listen (which includes WebSocket server)
+            server.listen(portToUse, () => {
                 const address = server.address();
                 let actualPort: number;
                 if (typeof address === 'string' || address === null) {
@@ -418,16 +457,16 @@ export function startServer(portToUse: number = DEFAULT_PORT, projectDir: string
                 } else {
                     actualPort = address.port;
                 }
-                console.log(`Forge Dashboard server listening on http://localhost:${actualPort}`);
-                console.log(`WebSocket server listening on ws://localhost:${actualPort}`);
-                resolve(actualPort); // Resolve with the actual port being used
-            }).on('error', (err: NodeJS.ErrnoException) => { // Add type for err
-                console.error(`Failed to start server listener on port ${portToUse}:`, err.message);
-                reject(err); // Reject if listener fails
+                logger.info(`Forge Dashboard server listening on http://localhost:${actualPort}`);
+                logger.info(`WebSocket server listening on ws://localhost:${actualPort}`);
+                resolve(actualPort);
+            }).on('error', (err: NodeJS.ErrnoException) => {
+                logger.error({ err, port: portToUse }, `Failed to start server listener`);
+                reject(err);
             });
         } catch (err) {
-             console.error("Server failed to start due to artifact loading error:", err);
-             reject(err); // Reject if artifact loading fails
+             logger.error({ err }, "Server failed to start due to artifact loading error");
+             reject(err);
         }
     });
 }
@@ -438,16 +477,15 @@ export { app, server, wss, broadcast };
 
 // --- Allow running server directly ---
 // --- Allow running server directly (for development/debugging, less relevant for CLI) ---
-// Check if this module is the main module being run
-// Note: When run via the bin script, require.main might not be this module.
-// The bin script is now the primary entry point.
-if (require.main === module) {
-    console.warn("Running server directly is intended for development. Use the 'forge-dashboard' command.");
-    // For direct execution, use default project path (cwd) and port
-    const devProjectPath = process.cwd();
-    startServer(DEFAULT_PORT, devProjectPath)
+// Check if running directly (e.g., via tsx watch) to auto-start
+if (isRunDirectly) {
+    // Use parsed args (including verbosity) from the top of the file
+    const argv = yargs(hideBin(process.argv)).option('verbose', { alias: 'v', type: 'count' }).parseSync();
+    const verbosity = argv.verbose || 0;
+    startServer(devPort, devProjectPath, verbosity)
         .catch(err => {
-            console.error("Server failed to start directly:", err);
+            // Logger might not be fully initialized if error is early, use console.error
+            console.error("Server failed to start in dev mode:", err);
             process.exit(1);
         });
 }
