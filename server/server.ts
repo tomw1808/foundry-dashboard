@@ -392,22 +392,7 @@ export function startServer(portToUse: number = DEFAULT_PORT, projectDir: string
         }
     });
 }
-            if (typeof address === 'string' || address === null) {
-                // This case might happen with IPC pipes, handle appropriately or throw error
-                console.error("Server listening on pipe/path, not port:", address);
-                actualPort = portToUse; // Fallback or handle error
-            } else {
-                actualPort = address.port;
-            }
-            console.log(`Forge Dashboard server listening on http://localhost:${actualPort}`);
-            console.log(`WebSocket server listening on ws://localhost:${actualPort}`);
-            resolve(actualPort); // Resolve with the actual port being used
-        }).on('error', (err: NodeJS.ErrnoException) => { // Add type for err
-            console.error(`Failed to start server on port ${portToUse}:`, err.message);
-            reject(err);
-        });
-    });
-}
+           
 
 // Export other components if needed for testing or extension
 export { app, server, wss, broadcast };
