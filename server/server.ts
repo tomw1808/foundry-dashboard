@@ -133,9 +133,9 @@ async function loadArtifacts(artifactsDir: string): Promise<LoadedArtifact[]> {
     try {
         // Check if directory exists before reading
         await fs.access(artifactsDir);
-        const entries = await fs.readdir(dir, { withFileTypes: true });
+        const entries = await fs.readdir(artifactsDir, { withFileTypes: true }); // Use artifactsDir
         for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
+            const fullPath = path.join(artifactsDir, entry.name); // Use artifactsDir
             if (entry.isDirectory()) {
                 // Recursively search subdirectories (like Contract.sol/)
                 artifacts.push(...await loadArtifacts(fullPath));
