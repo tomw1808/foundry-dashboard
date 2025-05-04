@@ -1,0 +1,5 @@
+.aider*
+.pki
+.cache
+node_modules
+dist

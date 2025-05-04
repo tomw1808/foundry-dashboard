@@ -475,17 +475,16 @@ export function startServer(portToUse: number = DEFAULT_PORT, projectDir: string
 // Export other components if needed for testing or extension
 export { app, server, wss, broadcast };
 
-// --- Allow running server directly ---
-// --- Allow running server directly (for development/debugging, less relevant for CLI) ---
-// Check if running directly (e.g., via tsx watch) to auto-start
-if (isRunDirectly) {
-    // Use parsed args (including verbosity) from the top of the file
-    const argv = yargs(hideBin(process.argv)).option('verbose', { alias: 'v', type: 'count' }).parseSync();
-    const verbosity = argv.verbose || 0;
-    startServer(devPort, devProjectPath, verbosity)
+// Check if this module is the main module being run
+// Note: When run via the bin script, require.main might not be this module.
+// The bin script is now the primary entry point.
+if (require.main === module) {
+    console.warn("Running server directly is intended for development. Use the 'forge-dashboard' command.");
+    // For direct execution, use default project path (cwd) and port
+    const devProjectPath = process.cwd();
+    startServer(DEFAULT_PORT, devProjectPath)
         .catch(err => {
-            // Logger might not be fully initialized if error is early, use console.error
-            console.error("Server failed to start in dev mode:", err);
+            console.error("Server failed to start directly:", err);
             process.exit(1);
         });
 }
