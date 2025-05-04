@@ -35,10 +35,12 @@
     "@types/node": "^20.14.13", 
     "@types/open": "^6.0.0", 
     "@types/ws": "^8.5.11",
+    "@types/yargs": "^17.0.32", // Add yargs types
     "concurrently": "^9.1.2",
-    "nodemon": "^3.1.10", 
-    "tsx": "^4.16.2", 
-    "typescript": "^5.5.4" 
+    "nodemon": "^3.1.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "yargs": "^17.7.2" // Add yargs dependency
   },
   "engines": {
     "node": ">=16"

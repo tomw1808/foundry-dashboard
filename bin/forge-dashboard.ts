@@ -3,30 +3,48 @@
 // Note: This script will be compiled to JS in the 'dist' folder.
 // Imports should work relative to the compiled location or use absolute paths/module resolution.
 
+#!/usr/bin/env node
+
 // Using require for compatibility with CommonJS output and older 'open' version
-const open = require('open');
+import open from 'open'; // Use import with esModuleInterop
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+import path from 'path'; // Import path for resolving project path
+
 // Import from the compiled server location
-const { startServer } = require('../server/server'); // Adjust path relative to dist/bin/forge-dashboard.js
-
-// Basic argument parsing (can use libraries like yargs for more complex needs)
-const args: string[] = process.argv.slice(2);
-const portArg: string | undefined = args.find(arg => arg.startsWith('--port='));
-const defaultPort = 3001; // Keep default port consistent
-let port: number = defaultPort;
-
-if (portArg) {
-    const portNum = parseInt(portArg.split('=')[1], 10);
-    if (!isNaN(portNum) && portNum > 0 && portNum < 65536) {
-        port = portNum;
-    } else {
-        console.warn(`Invalid port specified: "${portArg}". Using default port ${defaultPort}.`);
-    }
-}
+// Adjust path relative to dist/bin/forge-dashboard.js
+import { startServer } from '../server/server';
 
 async function main() {
+    // --- Argument Parsing with yargs ---
+    const argv = await yargs(hideBin(process.argv))
+        .option('port', {
+            alias: 'p',
+            type: 'number',
+            description: 'Port to run the dashboard server on',
+            default: 3001
+        })
+        .option('path', {
+            alias: 'd', // Directory
+            type: 'string',
+            description: 'Path to the Foundry project root directory',
+            default: process.cwd(), // Default to current working directory
+            coerce: (p) => path.resolve(p) // Ensure path is absolute
+        })
+        .help()
+        .alias('help', 'h')
+        .argv;
+
+    const port = argv.port;
+    const projectPath = argv.path;
+
+    console.log(`Using project path: ${projectPath}`);
+    console.log(`Attempting to start server on port: ${port}`);
+    // --- End Argument Parsing ---
+
     try {
-        // Start the server and get the actual port it's listening on
-        const actualPort: number = await startServer(port);
+        // Pass projectPath to startServer
+        const actualPort: number = await startServer(port, projectPath);
         const url = `http://localhost:${actualPort}`;
         console.log(`Forge Dashboard server started. Opening dashboard at ${url}`);
 

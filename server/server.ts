@@ -38,12 +38,10 @@ let loadedArtifacts: LoadedArtifact[] = [];
 // Store pending RPC requests: Map<requestId, PendingRequest>
 const pendingRequests = new Map<string, PendingRequest>();
 
-// --- Configuration ---
-// TODO: Make project path configurable via CLI args
-const projectPath = process.cwd(); // Default to current working directory
-const artifactsOutDir = path.join(projectPath, 'out'); // Default artifacts dir
+// Configuration will be passed via startServer function
+let artifactsOutDir: string = ''; // Initialize, will be set in startServer
 
-const PORT: number = parseInt(process.env.PORT || '3001', 10);
+const DEFAULT_PORT: number = 3001;
 
 // --- Middleware ---
 app.use(cors()); // Enable CORS for all origins (adjust for production later if needed)
@@ -128,10 +126,13 @@ function broadcast(message: any): void { // Add type for message and return type
 }
 
 // --- Artifact Loading ---
-async function loadArtifacts(dir: string): Promise<LoadedArtifact[]> {
-    console.log(`Loading artifacts from: ${dir}`);
+// Takes the determined artifacts directory path
+async function loadArtifacts(artifactsDir: string): Promise<LoadedArtifact[]> {
+    console.log(`Loading artifacts from: ${artifactsDir}`);
     const artifacts: LoadedArtifact[] = [];
     try {
+        // Check if directory exists before reading
+        await fs.access(artifactsDir);
         const entries = await fs.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
@@ -161,9 +162,9 @@ async function loadArtifacts(dir: string): Promise<LoadedArtifact[]> {
         }
     } catch (err: any) {
         if (err.code === 'ENOENT') {
-            console.warn(`Artifact directory not found: ${dir}. Decoding will be unavailable.`);
+            console.warn(`Artifact directory not found: ${artifactsDir}. Decoding will be unavailable.`);
         } else {
-            console.error(`Error reading artifact directory ${dir}:`, err);
+            console.error(`Error reading artifact directory ${artifactsDir}:`, err);
         }
     }
     return artifacts;
@@ -357,11 +358,40 @@ app.get('*', (req: Request, res: Response) => { // Add types
 
 
 // --- Server startup logic ---
-export function startServer(portToUse: number = PORT): Promise<number> { // Add types
-    return new Promise((resolve, reject) => {
-        server.listen(portToUse, () => { // Use server.listen (which includes WebSocket server)
-            const address = server.address();
-            let actualPort: number;
+// Accept port and projectPath
+export function startServer(portToUse: number = DEFAULT_PORT, projectDir: string): Promise<number> {
+    // Determine artifacts directory based on provided project path
+    artifactsOutDir = path.join(projectDir, 'out'); // Assuming 'out' subdir
+    console.log(`Resolved artifacts directory: ${artifactsOutDir}`);
+
+    return new Promise(async (resolve, reject) => { // Make promise async for await
+        try {
+            // Load artifacts before starting the server listener
+            loadedArtifacts = await loadArtifacts(artifactsOutDir);
+            console.log(`Successfully loaded ${loadedArtifacts.length} artifacts.`);
+
+            server.listen(portToUse, () => { // Use server.listen (which includes WebSocket server)
+                const address = server.address();
+                let actualPort: number;
+                if (typeof address === 'string' || address === null) {
+                    console.error("Server listening on pipe/path, not port:", address);
+                    actualPort = portToUse;
+                } else {
+                    actualPort = address.port;
+                }
+                console.log(`Forge Dashboard server listening on http://localhost:${actualPort}`);
+                console.log(`WebSocket server listening on ws://localhost:${actualPort}`);
+                resolve(actualPort); // Resolve with the actual port being used
+            }).on('error', (err: NodeJS.ErrnoException) => { // Add type for err
+                console.error(`Failed to start server listener on port ${portToUse}:`, err.message);
+                reject(err); // Reject if listener fails
+            });
+        } catch (err) {
+             console.error("Server failed to start due to artifact loading error:", err);
+             reject(err); // Reject if artifact loading fails
+        }
+    });
+}
             if (typeof address === 'string' || address === null) {
                 // This case might happen with IPC pipes, handle appropriately or throw error
                 console.error("Server listening on pipe/path, not port:", address);
@@ -383,17 +413,17 @@ export function startServer(portToUse: number = PORT): Promise<number> { // Add 
 export { app, server, wss, broadcast };
 
 // --- Allow running server directly ---
+// --- Allow running server directly (for development/debugging, less relevant for CLI) ---
 // Check if this module is the main module being run
+// Note: When run via the bin script, require.main might not be this module.
+// The bin script is now the primary entry point.
 if (require.main === module) {
-    // Load artifacts before starting the server
-    loadArtifacts(artifactsOutDir)
-        .then(artifacts => {
-            loadedArtifacts = artifacts;
-            console.log(`Successfully loaded ${loadedArtifacts.length} artifacts.`);
-            return startServer(); // Start server after loading
-        })
+    console.warn("Running server directly is intended for development. Use the 'forge-dashboard' command.");
+    // For direct execution, use default project path (cwd) and port
+    const devProjectPath = process.cwd();
+    startServer(DEFAULT_PORT, devProjectPath)
         .catch(err => {
-            console.error("Server failed to start due to artifact loading or server error:", err);
+            console.error("Server failed to start directly:", err);
             process.exit(1);
         });
 }
