@@ -15,8 +15,7 @@ interface DecodedArg {
     type: string;
     value: any;
 }
-
-}
+// Removed extra closing brace here
 interface DecodedDeploymentInfo extends DecodedInfoBase {
     type: 'deployment';
     constructorArgs?: DecodedArg[]; // Now an array of DecodedArg
