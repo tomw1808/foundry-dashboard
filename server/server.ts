@@ -240,7 +240,7 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                             const bytecodeLength = longestMatch.bytecode?.length ?? 0;
                             const argsData = `0x${txData.slice(bytecodeLength)}` as Hex;
                             if (argsData.length > 2) { // Check if there's actual arg data
-                                try {
+                                
                                 try {
                                     const decodedValues = decodeAbiParameters(constructorAbi.inputs, argsData);
                                     // Map values to names from ABI inputs
