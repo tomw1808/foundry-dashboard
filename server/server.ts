@@ -283,15 +283,17 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
                             );
 
                             let formattedArgs: any[] = [];
-                            if (functionAbi?.inputs && args) {
-                                formattedArgs = functionAbi.inputs.map((input, index) => ({
+                            // Ensure functionAbi is found AND is actually a function type before accessing inputs
+                            if (functionAbi && functionAbi.type === 'function' && functionAbi.inputs && args) {
+                                // Add types for input and index in map callback
+                                formattedArgs = functionAbi.inputs.map((input: { name?: string; type: string }, index: number) => ({
                                     name: input.name || `arg${index}`,
                                     type: input.type,
                                     value: args[index],
                                 }));
-                            } else {
-                                // Handle case where args might exist but ABI inputs don't match (shouldn't happen often)
-                                formattedArgs = args?.map((arg, index) => ({ name: `arg${index}`, type: 'unknown', value: arg })) ?? [];
+                            } else if (args) { // Fallback if ABI item wasn't a function or inputs were missing
+                                // Handle case where args might exist but ABI inputs don't match
+                                formattedArgs = args.map((arg: any, index: number) => ({ name: `arg${index}`, type: 'unknown', value: arg }));
                             }
 
                             decodedInfo = {
