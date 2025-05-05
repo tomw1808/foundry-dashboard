@@ -79,7 +79,7 @@ function App() {
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
   const [processedRequests, setProcessedRequests] = useState(0);
   const [trackedTxs, setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
-  const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
+  // Removed unused currentBlockNumber state: const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -223,9 +223,9 @@ function App() {
 
   // --- Block Number Watching Effect ---
   useWatchBlockNumber({
-      onBlockNumber(blockNumber: bigint) {
+      onBlockNumber(blockNumber: bigint) { // blockNumber parameter is used directly below
           console.trace(`New block received: ${blockNumber}`);
-          setCurrentBlockNumber(blockNumber);
+          // Removed: setCurrentBlockNumber(blockNumber);
           // Update confirmations for already confirmed transactions
           setTrackedTxs(prevMap => {
               const newMap = new Map(prevMap);
