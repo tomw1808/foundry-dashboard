@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.2...v1.1.3) (2025-05-05)
+
+
+### Bug Fixes
+
+* added yargs ([4360a9b](https://github.com/tomw1808/foundry-dashboard/commit/4360a9be446ca2bea64f1cbe8f88a4d8b12c12eb))
+
 ## [1.1.2](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.1...v1.1.2) (2025-05-05)
 
 
