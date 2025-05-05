@@ -619,7 +619,6 @@ function App() {
                       </>
                     )}
                      {/* Common area for displaying args */}
-                     {/* Common area for displaying args */}
                      {(request.payload.decoded.type === 'deployment' && request.payload.decoded.constructorArgs && request.payload.decoded.constructorArgs.length > 0) && (
                         <div className="text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
                             {request.payload.decoded.constructorArgs.map((arg, index) => (
@@ -709,7 +708,7 @@ function App() {
                                     </div>
                                     <div className="flex items-center space-x-2 mb-1">
                                         <span className="text-gray-400 w-12 flex-shrink-0">Hash:</span>
-                                        <span className="font-mono text-xs truncate flex-grow">{tx.hash}</span>
+                                        <span className="font-mono text-xs truncate">{tx.hash}</span>
                                         <button onClick={() => copyToClipboard(tx.hash)} title="Copy Hash" className="text-gray-500 hover:text-white">
                                             <Copy size={14} />
                                         </button>
