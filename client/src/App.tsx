@@ -38,8 +38,9 @@ interface TrackedTxInfo {
     confirmations: number;
     blockNumber?: bigint | null;
     contractAddress?: Address | null;
-    timestamp: number; // When it was added
-    chainId: number; // Chain it was submitted on
+    timestamp: number;
+    chainId: number;
+    label: string; // Description of the transaction
 }
 
 // --- Helper: Block Explorer URLs ---
@@ -68,6 +69,23 @@ const copyToClipboard = async (text: string | undefined | null) => {
         console.error('Failed to copy:', err);
     }
 };
+
+// --- Helper: Generate Transaction Label ---
+function generateTxLabel(decodedInfo: DecodedInfo | null | undefined): string {
+    if (!decodedInfo) {
+        return 'Unknown Transaction';
+    }
+    if (decodedInfo.type === 'deployment') {
+        // Basic label, could be enhanced to show args if needed
+        return `Deploy ${decodedInfo.contractName}`;
+    }
+    if (decodedInfo.type === 'functionCall') {
+        // Basic label, could show args count or simple representation
+        const argsPreview = decodedInfo.args?.map(arg => arg.name || '?').join(', ') || '';
+        return `Call ${decodedInfo.contractName}.${decodedInfo.functionName}(${argsPreview})`;
+    }
+    return 'Unknown Transaction';
+}
 
 
 function App() {
@@ -466,6 +484,7 @@ function App() {
 
       const txHash = result as Hex;
       const currentChainId = chainId; // Capture current chainId
+      const decodedInfo = request.payload.decoded; // Get decoded info from original request
 
       if (txHash && currentChainId) {
           const newTrackedTx: TrackedTxInfo = {
@@ -474,6 +493,7 @@ function App() {
               confirmations: 0,
               timestamp: Date.now(),
               chainId: currentChainId,
+              label: generateTxLabel(decodedInfo), // Generate and store the label
           };
           // Update state immutably
           setTrackedTxs(prevMap => new Map(prevMap).set(txHash, newTrackedTx));
@@ -548,9 +568,15 @@ function App() {
              <span className="text-red-400">{wsStatus === 'error' ? 'Error' : 'Disconnected'}</span>
           }</p>
           <p>Wallet Status: {isConnected ? <span className="text-green-400">Connected</span> : <span className="text-red-400">Not Connected</span>}</p>
-          {isConnected && (
+          {isConnected && address && ( // Ensure address exists
             <>
-              <p>Address: <span className="font-mono text-sm">{address}</span></p>
+              <div className="flex items-center space-x-2">
+                 <p>Address:</p>
+                 <span className="font-mono text-sm">{address}</span>
+                 <button onClick={() => copyToClipboard(address)} title="Copy Address" className="text-gray-500 hover:text-white">
+                     <Copy size={14} />
+                 </button>
+              </div>
               <p>Chain ID: {chainId}</p>
               <p>Processed Requests: {processedRequests}</p> {/* Display counter */}
             </>
@@ -677,11 +703,13 @@ function App() {
                                             Status: {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                                             {isConfirmed && ` (${tx.confirmations} conf.)`}
                                         </span>
-                                        <span className="text-xs text-gray-500">{new Date(tx.timestamp).toLocaleString()}</span>
+                                        {/* Display Label */}
+                                        <span className="text-gray-300 truncate" title={tx.label}>{tx.label}</span>
+                                        <span className="text-xs text-gray-500 flex-shrink-0">{new Date(tx.timestamp).toLocaleString()}</span>
                                     </div>
                                     <div className="flex items-center space-x-2 mb-1">
-                                        <span className="text-gray-400">Hash:</span>
-                                        <span className="font-mono text-xs truncate">{tx.hash}</span>
+                                        <span className="text-gray-400 w-12 flex-shrink-0">Hash:</span>
+                                        <span className="font-mono text-xs truncate flex-grow">{tx.hash}</span>
                                         <button onClick={() => copyToClipboard(tx.hash)} title="Copy Hash" className="text-gray-500 hover:text-white">
                                             <Copy size={14} />
                                         </button>
