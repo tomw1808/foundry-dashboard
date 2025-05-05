@@ -1,6 +1,6 @@
 {
   "name": "foundry-dashboard",
-  "version": "0.0.2",
+  "version": "1.0.1",
   "description": "A local dashboard for interacting with Foundry projects via browser wallets similar to how Truffle Dashboard worked before. Just optimized for Foundry Projects with ABI decoding.",
   "main": "dist/server/server.js",
   "repository": {
@@ -11,26 +11,26 @@
     "foundry-dashboard": "./dist/bin/foundry-dashboard.js"
   },
   "scripts": {
-    "server": "node dist/server/server.js", 
-    "server:dev": "tsx watch server/server.ts", 
+    "server": "node dist/server/server.js",
+    "server:dev": "tsx watch server/server.ts",
     "client:dev": "cd client && npm run dev",
     "dev": "concurrently \"npm:server:dev\" \"npm:client:dev\"",
     "build:client": "cd client && npm run build",
-    "build:server": "tsc -p tsconfig.server.json", 
-    "build": "npm run build:client && npm run build:server", 
-    "start": "node ./dist/bin/forge-dashboard.js", 
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node ./dist/bin/forge-dashboard.js",
     "prestart": "npm run build",
-    "typecheck": "tsc -p tsconfig.server.json --noEmit" 
+    "typecheck": "tsc -p tsconfig.server.json --noEmit"
   },
   "files": [
-    "dist/", 
+    "dist/",
     "client/dist/"
   ],
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "open": "^8.4.0",
-    "pino": "^9.3.2", 
+    "pino": "^9.3.2",
     "viem": "^2.28.3",
     "ws": "^8.18.2"
   },
@@ -43,7 +43,7 @@
     "@types/yargs": "^17.0.32",
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.10",
-    "pino-pretty": "^11.2.1", 
+    "pino-pretty": "^11.2.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4",
     "node": ">=16"

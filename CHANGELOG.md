@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/tomw1808/foundry-dashboard/compare/v1.0.0...v1.0.1) (2025-05-05)
+
+
+### Bug Fixes
+
+* updated the release type to node ([f445f74](https://github.com/tomw1808/foundry-dashboard/commit/f445f743b95f2e511c442c9ad462e977388417b0))
+
 ## 1.0.0 (2025-05-05)
 
 
