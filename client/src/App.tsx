@@ -333,64 +333,15 @@ function App() {
       let result: any;
       // Assuming eth_sendTransaction is the primary signing method for now
       if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
-        const rawTx = payload.params[0] as any; // Receive as 'any' initially for inspection
-        console.log(`[${requestId}] Raw transaction object received:`, JSON.stringify(rawTx, null, 2));
+        const rawTx = payload.params[0] as any;
 
-        // --- Sanitize the transaction object ---
-        const sanitizedTx: TransactionRequest = {
-          // ...rawTx,
-          // Explicitly convert gas-related fields and value from hex strings to bigint
-          ...(rawTx.gas && { gas: BigInt(rawTx.gas) }), // Optional: gas/gasLimit
-          ...(rawTx.gasPrice && { gasPrice: BigInt(rawTx.gasPrice) }), // For legacy tx
-          ...(rawTx.maxFeePerGas && { maxFeePerGas: BigInt(rawTx.maxFeePerGas) }), // For EIP-1559 tx
-          ...(rawTx.maxPriorityFeePerGas && { maxPriorityFeePerGas: BigInt(rawTx.maxPriorityFeePerGas) }), // For EIP-1559 tx
-          ...(rawTx.value && { value: BigInt(rawTx.value) }),
-          // Nonce needs to be a number for viem
-          ...(rawTx.nonce !== undefined && { nonce: typeof rawTx.nonce === 'string' ? parseInt(rawTx.nonce, 16) : rawTx.nonce }),
-          // Ensure 'from' is correctly typed as Address (string)
-          ...(rawTx.from && { from: rawTx.from as Address }),
-          // DO NOT explicitly set 'to' or 'data' here initially; handle below
-        };
-
-        // --- Explicitly handle 'data' (preferring 'input' from Foundry) ---
-        if (rawTx.input !== undefined && rawTx.input !== null) {
-          sanitizedTx.data = rawTx.input as `0x${string}`;
-          console.log(`[${requestId}] Mapping rawTx.input to sanitizedTx.data`);
-        } else if (rawTx.data !== undefined && rawTx.data !== null) {
-          sanitizedTx.data = rawTx.data as `0x${string}`;
-          console.log(`[${requestId}] Using rawTx.data for sanitizedTx.data`);
-        }
-        // --- Delete the original 'input' field if it exists ---
-        delete sanitizedTx.input;
+        // --- Sanitize the transaction object using the utility function ---
+        const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
         // --- ---
 
-        // --- Explicitly handle the 'to' field ---
-        if (rawTx.to !== null && rawTx.to !== undefined) {
-          // If 'to' exists in the raw transaction, add it as Address
-          sanitizedTx.to = rawTx.to as Address;
-          console.log(`[${requestId}] Setting 'to' address: ${sanitizedTx.to}`);
-        } else {
-          // If 'to' is null or undefined (contract creation), set to ZERO ADDRESS
-          // as sendTransaction might require *some* address.
-          console.log(`[${requestId}] 'to' address is null/undefined (contract creation).`);
-          // Ensure 'to' is omitted from the object passed to window.ethereum.request
-          delete sanitizedTx.to;
-        }
-        // --- ---
-
-        // Remove potentially problematic fields if they are null/undefined after sanitization
-        // (e.g., don't send both gasPrice and EIP-1559 fields)
-        if (sanitizedTx.maxFeePerGas !== undefined || sanitizedTx.maxPriorityFeePerGas !== undefined) {
-            delete sanitizedTx.gasPrice; // Remove legacy gasPrice if EIP-1559 fields exist
-        } else if (sanitizedTx.gasPrice !== undefined) {
-             delete sanitizedTx.maxFeePerGas;
-             delete sanitizedTx.maxPriorityFeePerGas;
-        }
-        // Removed the redundant delete block for 'to' here
-
-        // console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (_key, value) =>
-        //     typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
-        // , 2)); // Reduce noise
+        console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (_key, value) =>
+            typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
+        , 2));
 
         // Always use viem's walletClient now
         console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
