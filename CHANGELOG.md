@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/tomw1808/foundry-dashboard/compare/v1.0.1...v1.1.0) (2025-05-05)
+
+
+### Features
+
+* automatic npm publishing ([a8e1a59](https://github.com/tomw1808/foundry-dashboard/commit/a8e1a598de45f4400cde7ca3835198be3df1217f))
+
 ## [1.0.1](https://github.com/tomw1808/foundry-dashboard/compare/v1.0.0...v1.0.1) (2025-05-05)
 
 
