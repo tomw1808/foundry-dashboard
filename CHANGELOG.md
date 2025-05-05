@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.1...v1.1.2) (2025-05-05)
+
+
+### Bug Fixes
+
+* Linter Error for BlockTag Type from Viem ([3124d91](https://github.com/tomw1808/foundry-dashboard/commit/3124d917750f1339336825a6b43b95c7c8b6d6c8))
+
 ## [1.1.1](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.0...v1.1.1) (2025-05-05)
 
 
