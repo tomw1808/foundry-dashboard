@@ -1,6 +1,6 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi'; // Import useWatchBlockNumber
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, SetStateAction } from 'react';
 import { Address, TransactionRequest, Hex } from 'viem'; // Import Hex
 import { Copy, ExternalLink } from 'lucide-react'; // Import icons
 
@@ -223,7 +223,7 @@ function App() {
 
   // --- Block Number Watching Effect ---
   useWatchBlockNumber({
-      onBlockNumber(blockNumber) {
+      onBlockNumber(blockNumber: bigint) {
           console.trace(`New block received: ${blockNumber}`);
           setCurrentBlockNumber(blockNumber);
           // Update confirmations for already confirmed transactions
