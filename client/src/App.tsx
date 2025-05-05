@@ -1,9 +1,9 @@
 import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi';
 import { useEffect, useState, useRef } from 'react';
-import { Address, TransactionRequest, Hex } from 'viem';
+import { Address, Hex } from 'viem';
 
 // Import types and components
-import { SignRequest, TrackedTxInfo, WsStatus, RpcPayload } from '@/types';
+import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types';
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { DashboardStatus } from '@/components/DashboardStatus';

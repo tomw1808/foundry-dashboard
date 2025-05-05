@@ -1,4 +1,4 @@
-import { Abi, Address, Hex, TransactionRequest } from 'viem';
+import { Address, Hex } from 'viem';
 
 // --- Shared Types ---
 

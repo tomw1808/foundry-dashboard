@@ -1,5 +1,6 @@
 import { TrackedTxInfo } from '@/types'; // Assuming types are in src/types.ts
 import { Copy, ExternalLink } from 'lucide-react';
+import { Hex } from 'viem';
 
 interface TrackedTransactionsListProps {
     trackedTxs: Map<Hex, TrackedTxInfo>;
