@@ -32,7 +32,8 @@
     "open": "^8.4.0",
     "pino": "^9.3.2",
     "viem": "^2.28.3",
-    "ws": "^8.18.2"
+    "ws": "^8.18.2",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -42,11 +43,11 @@
     "@types/ws": "^8.5.11",
     "@types/yargs": "^17.0.32",
     "concurrently": "^9.1.2",
+    "node": ">=16",
     "nodemon": "^3.1.10",
     "pino-pretty": "^11.2.1",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.4",
-    "node": ">=16"
+    "typescript": "^5.5.4"
   },
   "license": "MIT"
 }
