@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.0...v1.1.1) (2025-05-05)
+
+
+### Bug Fixes
+
+* github npm release action missing installed node_modules ([26b437b](https://github.com/tomw1808/foundry-dashboard/commit/26b437b49c6977e5ed1a4e8a5b26762deaa5ce16))
+
 ## [1.1.0](https://github.com/tomw1808/foundry-dashboard/compare/v1.0.1...v1.1.0) (2025-05-05)
 
 
