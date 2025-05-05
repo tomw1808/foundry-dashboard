@@ -1,94 +1,18 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi'; // Import useWatchBlockNumber
+import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi';
 import { useEffect, useState, useRef } from 'react';
-import { Address, TransactionRequest, Hex } from 'viem'; // Import Hex
-import { Copy, ExternalLink } from 'lucide-react'; // Import icons
+import { Address, TransactionRequest, Hex } from 'viem';
 
-// Define types for RPC payload and signing request
-type RpcPayload = { method: string; params: any[]; id: number | string; decoded?: DecodedInfo | null };
-// Define structure for decoded info (adjust as needed based on backend output)
-interface DecodedInfoBase {
-    type: 'deployment' | 'functionCall';
-    contractName: string;
-}
-// Define structure for a single decoded argument
-interface DecodedArg {
-    name: string;
-    type: string;
-    value: any;
-}
-// Removed extra closing brace here
-interface DecodedDeploymentInfo extends DecodedInfoBase {
-    type: 'deployment';
-    constructorArgs?: DecodedArg[]; // Now an array of DecodedArg
-}
-interface DecodedFunctionInfo extends DecodedInfoBase {
-    type: 'functionCall';
-    functionName: string;
-    args?: DecodedArg[]; // Now an array of DecodedArg
-}
-type DecodedInfo = DecodedDeploymentInfo | DecodedFunctionInfo;
-
-type SignRequest = { requestId: string; payload: RpcPayload };
-
-// Define type for tracked transaction info
-interface TrackedTxInfo {
-    hash: Hex;
-    status: 'pending' | 'success' | 'reverted' | 'checking'; // Add 'checking' state
-    confirmations: number;
-    blockNumber?: bigint | null;
-    contractAddress?: Address | null;
-    timestamp: number;
-    chainId: number;
-    label: string; // Description of the transaction
-}
-
-// --- Helper: Block Explorer URLs ---
-const BLOCK_EXPLORER_URLS: Record<number, string> = {
-    1: 'https://etherscan.io',
-    11155111: 'https://sepolia.etherscan.io',
-    10: 'https://optimistic.etherscan.io',
-    137: 'https://polygonscan.com',
-    8453: 'https://basescan.org',
-    // Add more chains as needed
-};
-
-function getExplorerLink(chainId: number, type: 'tx' | 'address', hashOrAddress: string): string | null {
-    const baseUrl = BLOCK_EXPLORER_URLS[chainId];
-    if (!baseUrl) return null;
-    return `${baseUrl}/${type}/${hashOrAddress}`;
-}
-
-// --- Helper: Copy to Clipboard ---
-const copyToClipboard = async (text: string | undefined | null) => {
-    if (!text) return;
-    try {
-        await navigator.clipboard.writeText(text);
-        console.log('Copied to clipboard:', text); // TODO: Add user feedback (e.g., toast)
-    } catch (err) {
-        console.error('Failed to copy:', err);
-    }
-};
-
-// --- Helper: Generate Transaction Label ---
-function generateTxLabel(decodedInfo: DecodedInfo | null | undefined): string {
-    if (!decodedInfo) {
-        return 'Unknown Transaction';
-    }
-    if (decodedInfo.type === 'deployment') {
-        // Basic label, could be enhanced to show args if needed
-        return `Deploy ${decodedInfo.contractName}`;
-    }
-    if (decodedInfo.type === 'functionCall') {
-        // Basic label, could show args count or simple representation
-        const argsPreview = decodedInfo.args?.map(arg => arg.name || '?').join(', ') || '';
-        return `Call ${decodedInfo.contractName}.${decodedInfo.functionName}(${argsPreview})`;
-    }
-    return 'Unknown Transaction';
-}
+// Import types and components
+import { SignRequest, TrackedTxInfo, WsStatus, RpcPayload } from '@/types';
+import { getExplorerLink, copyToClipboard, generateTxLabel } from '@/lib/utils';
+import { DashboardHeader } from '@/components/DashboardHeader';
+import { DashboardStatus } from '@/components/DashboardStatus';
+import { PendingActionsList } from '@/components/PendingActionsList';
+import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
 
 
 function App() {
+  // --- Hooks ---
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId }); // Ensure publicClient uses current chainId
   const { data: walletClient } = useWalletClient();
@@ -264,7 +188,8 @@ function App() {
 
 
   // --- RPC Request Handling ---
-  const handleRpcRequest = async (requestId: string, payload: { method: string; params: any[]; id: number | string }) => {
+  const handleRpcRequest = async (requestId: string, payload: RpcPayload) => { // Use RpcPayload type
+    // RPC handling logic remains here
     // --- Access the WebSocket instance via the ref ---
     const currentWs = wsRef.current;
     // --- ---
@@ -386,6 +311,7 @@ function App() {
 
   // --- Sign Transaction Handler ---
   const handleSignTransaction = async (request: SignRequest) => {
+    // Signing logic remains here
     const { requestId, payload } = request;
     const currentWs = wsRef.current;
 
@@ -521,6 +447,7 @@ function App() {
 
   // --- Reject Transaction Handler ---
   const handleRejectTransaction = (requestId: string) => {
+    // Rejection logic remains here
     const currentWs = wsRef.current;
     console.log(`User rejected request ${requestId}`);
     if (currentWs && currentWs.readyState === WebSocket.OPEN) {
@@ -535,8 +462,8 @@ function App() {
   };
 
   // --- Send Signing Response back via WebSocket ---
-  // Note: This is similar to sendRpcResponse but uses a different type
   const sendSignResponse = (socketInstance: WebSocket, requestId: string, response: { result?: any; error?: any }) => {
+    // Sending sign response logic remains here
     if (socketInstance.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({
         type: 'signResponse', // Use 'signResponse' type
@@ -553,192 +480,32 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
-      <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700">
-        <h1 className="text-xl md:text-2xl font-bold">⚡️ Forge Dashboard</h1>
-        <ConnectButton />
-      </header>
+      <DashboardHeader />
 
       <main className="w-full max-w-4xl mt-8 p-4 bg-gray-800 rounded shadow-lg">
         <h2 className="text-xl mb-4">Dashboard Status</h2>
-        <div className="mb-4">
-          {/* Display status based on wsStatus state */}
-          <p>WebSocket Status: {
-             wsStatus === 'open' ? <span className="text-green-400">Connected</span> :
-             wsStatus === 'connecting' ? <span className="text-yellow-400">Connecting...</span> :
-             <span className="text-red-400">{wsStatus === 'error' ? 'Error' : 'Disconnected'}</span>
-          }</p>
-          <p>Wallet Status: {isConnected ? <span className="text-green-400">Connected</span> : <span className="text-red-400">Not Connected</span>}</p>
-          {isConnected && address && ( // Ensure address exists
-            <>
-              <div className="flex items-center space-x-2">
-                 <p>Address:</p>
-                 <span className="font-mono text-sm">{address}</span>
-                 <button onClick={() => copyToClipboard(address)} title="Copy Address" className="text-gray-500 hover:text-white">
-                     <Copy size={14} />
-                 </button>
-              </div>
-              <p>Chain ID: {chainId}</p>
-              <p>Processed Requests: {processedRequests}</p> {/* Display counter */}
-            </>
-          )}
-        </div>
+        <DashboardStatus
+            wsStatus={wsStatus}
+            isConnected={isConnected}
+            address={address}
+            chainId={chainId}
+            processedRequests={processedRequests}
+            copyToClipboard={copyToClipboard}
+        />
 
-        {/* Section for Pending Signing Requests */}
-        {pendingSignRequests.length > 0 && (
-          <div className="mt-8 w-full">
-            <h3 className="text-xl mb-4 text-yellow-400">Pending Actions</h3>
-            {pendingSignRequests.map((request) => (
-              <div key={request.requestId} className="mb-4 p-4 border border-yellow-600 rounded bg-gray-800 shadow-md">
-                <h4 className="text-lg font-semibold mb-2">Request ID: <span className="font-mono text-sm">{request.requestId}</span></h4>
-                <p className="mb-1">Method: <span className="font-semibold">{request.payload.method}</span></p>
+        <PendingActionsList
+            pendingSignRequests={pendingSignRequests}
+            handleSignTransaction={handleSignTransaction}
+            handleRejectTransaction={handleRejectTransaction}
+            walletClient={walletClient}
+            isConnected={isConnected}
+        />
 
-                {/* Display Decoded Info if available */}
-                {request.payload.decoded ? (
-                  <div className="mb-3 p-2 border border-blue-500 rounded bg-gray-700">
-                    <p className="text-blue-300 font-semibold mb-1">Decoded Action:</p>
-                    {request.payload.decoded.type === 'deployment' && (
-                      <>
-                        <p>Deploy Contract: <span className="font-bold">{request.payload.decoded.contractName}</span></p>
-                        {request.payload.decoded.constructorArgs && request.payload.decoded.constructorArgs.length > 0 && (
-                           <p>Constructor Args:</p>
-                        )}
-                        {(!request.payload.decoded.constructorArgs || request.payload.decoded.constructorArgs.length === 0) && (
-                           <p>Constructor Args: <span className="italic">None</span></p>
-                        )}
-                      </>
-                    )}
-                    {request.payload.decoded.type === 'functionCall' && (
-                      <>
-                        <p>Call Function: <span className="font-bold">{request.payload.decoded.contractName}.{request.payload.decoded.functionName}</span></p>
-                        {request.payload.decoded.args && request.payload.decoded.args.length > 0 && (
-                           <p>Arguments:</p>
-                        )}
-                         {(!request.payload.decoded.args || request.payload.decoded.args.length === 0) && (
-                           <p>Arguments: <span className="italic">None</span></p>
-                        )}
-                      </>
-                    )}
-                     {/* Common area for displaying args */}
-                     {(request.payload.decoded.type === 'deployment' && request.payload.decoded.constructorArgs && request.payload.decoded.constructorArgs.length > 0) && (
-                        <div className="text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
-                            {request.payload.decoded.constructorArgs.map((arg, index) => (
-                                <div key={index} className="mb-1">
-                                    <span className="font-semibold text-gray-300">{arg.name}</span> (<span className="italic text-gray-400">{arg.type}</span>):
-                                    <pre className="inline whitespace-pre-wrap break-all ml-1">{JSON.stringify(arg.value, (_, val) => typeof val === 'bigint' ? val.toString() : val, 2)}</pre>
-                                </div>
-                            ))}
-                        </div>
-                     )}
-                      {(request.payload.decoded.type === 'functionCall' && request.payload.decoded.args && request.payload.decoded.args.length > 0) && (
-                        <div className="text-xs bg-gray-600 p-2 rounded max-h-40 overflow-y-auto mt-1">
-                            {request.payload.decoded.args.map((arg, index) => (
-                                <div key={index} className="mb-1">
-                                    <span className="font-semibold text-gray-300">{arg.name}</span> (<span className="italic text-gray-400">{arg.type}</span>):
-                                    <pre className="inline whitespace-pre-wrap break-all ml-1">{JSON.stringify(arg.value, (_, val) => typeof val === 'bigint' ? val.toString() : val, 2)}</pre>
-                                </div>
-                            ))}
-                        </div>
-                     )}
-                  </div>
-                ) : (
-                  <div className="mb-3">
-                    <p>Parameters:</p>
-                    <pre className="whitespace-pre-wrap break-all text-xs bg-gray-700 p-2 rounded max-h-40 overflow-y-auto">
-                      {JSON.stringify(request.payload.params, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                {/* End Decoded Info Display */}
-
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => handleSignTransaction(request)}
-                    disabled={!walletClient || !isConnected}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Approve in Wallet
-                  </button>
-                  <button
-                    onClick={() => handleRejectTransaction(request.requestId)}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-semibold"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Section for Message Log (Removed for brevity, could be added back conditionally) */}
-        {/* <h3 className="text-lg mt-6 mb-2">Message Log</h3>
-        <div className="h-64 overflow-y-auto bg-gray-700 p-2 rounded font-mono text-xs">
-          {messages.length === 0 && <p>No messages received yet.</p>}
-          {messages.slice().reverse().map((msg, index) => ( // Show newest first
-            <pre key={messages.length - index -1} className="whitespace-pre-wrap break-all mb-1 p-1 bg-gray-600 rounded">{JSON.stringify(msg, null, 2)}</pre>
-          ))}
-        </div> */}
-
-        {/* Section for Tracked Transactions */}
-        <div className="mt-8 w-full">
-            <h3 className="text-xl mb-4 text-gray-400">Tracked Transactions</h3>
-            {trackedTxs.size === 0 ? (
-                <p className="text-gray-500 italic">No transactions tracked yet.</p>
-            ) : (
-                <div className="space-y-3">
-                    {/* Sort transactions by timestamp, newest first */}
-                    {Array.from(trackedTxs.values())
-                        .sort((a, b) => b.timestamp - a.timestamp)
-                        .map((tx) => {
-                            const txExplorerLink = getExplorerLink(tx.chainId, 'tx', tx.hash);
-                            const contractExplorerLink = tx.contractAddress ? getExplorerLink(tx.chainId, 'address', tx.contractAddress) : null;
-                            const isConfirmed = tx.status === 'success' || tx.status === 'reverted';
-                            const statusColor = tx.status === 'success' ? 'text-green-400' : tx.status === 'reverted' ? 'text-red-400' : 'text-yellow-400';
-
-                            return (
-                                <div key={tx.hash} className="p-3 border border-gray-700 rounded bg-gray-800 shadow-sm text-sm">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className={`font-semibold ${statusColor}`}>
-                                            Status: {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-                                            {isConfirmed && ` (${tx.confirmations} conf.)`}
-                                        </span>
-                                        {/* Display Label */}
-                                        <span className="text-gray-300 truncate" title={tx.label}>{tx.label}</span>
-                                        <span className="text-xs text-gray-500 flex-shrink-0">{new Date(tx.timestamp).toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2 mb-1">
-                                        <span className="text-gray-400 w-12 flex-shrink-0">Hash:</span>
-                                        <span className="font-mono text-xs truncate">{tx.hash}</span>
-                                        <button onClick={() => copyToClipboard(tx.hash)} title="Copy Hash" className="text-gray-500 hover:text-white">
-                                            <Copy size={14} />
-                                        </button>
-                                        {txExplorerLink && (
-                                            <a href={txExplorerLink} target="_blank" rel="noopener noreferrer" title="View on Explorer" className="text-blue-400 hover:text-blue-300">
-                                                <ExternalLink size={14} />
-                                            </a>
-                                        )}
-                                    </div>
-                                    {tx.contractAddress && (
-                                         <div className="flex items-center space-x-2">
-                                            <span className="text-gray-400">Contract Address:</span>
-                                            <span className="font-mono text-xs truncate">{tx.contractAddress}</span>
-                                            <button onClick={() => copyToClipboard(tx.contractAddress)} title="Copy Address" className="text-gray-500 hover:text-white">
-                                                <Copy size={14} />
-                                            </button>
-                                            {contractExplorerLink && (
-                                                <a href={contractExplorerLink} target="_blank" rel="noopener noreferrer" title="View on Explorer" className="text-blue-400 hover:text-blue-300">
-                                                    <ExternalLink size={14} />
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                    })}
-                </div>
-            )}
-        </div>
-        {/* End Tracked Transactions Section */}
+        <TrackedTransactionsList
+            trackedTxs={trackedTxs}
+            getExplorerLink={getExplorerLink}
+            copyToClipboard={copyToClipboard}
+        />
 
       </main>
     </div>
