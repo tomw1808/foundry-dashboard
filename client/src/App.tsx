@@ -1,6 +1,6 @@
 import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi';
 import { useEffect, useState, useRef } from 'react';
-import { Address, Hex } from 'viem';
+import { Address, BlockTag, Hex } from 'viem';
 
 // Import types and components
 import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types';
@@ -247,7 +247,7 @@ function App() {
 
             const nonce = await publicClient.getTransactionCount({
               address: targetAddress,
-              blockTag: blockTag || 'pending', // Default to 'pending' as scripts often need the next nonce
+              blockTag: (blockTag || 'pending') as BlockTag, // Default to 'pending' as scripts often need the next nonce
             });
             // If the above line completes, log success
             console.log(`[${requestId}] Successfully fetched nonce for ${targetAddress}: ${nonce}`);
