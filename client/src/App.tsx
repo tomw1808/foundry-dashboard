@@ -4,7 +4,7 @@ import { Address, TransactionRequest, Hex } from 'viem';
 
 // Import types and components
 import { SignRequest, TrackedTxInfo, WsStatus, RpcPayload } from '@/types';
-import { getExplorerLink, copyToClipboard, generateTxLabel } from '@/lib/utils';
+import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { DashboardStatus } from '@/components/DashboardStatus';
 import { PendingActionsList } from '@/components/PendingActionsList';
