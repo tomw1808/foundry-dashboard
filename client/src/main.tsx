@@ -17,7 +17,7 @@ if (WALLETCONNECT_PROJECT_ID === "YOUR_PROJECT_ID") {
 }
 
 const config = getDefaultConfig({
-  appName: 'Forge Dashboard',
+  appName: 'Foundry Dashboard',
   projectId: WALLETCONNECT_PROJECT_ID,
   chains: [mainnet, sepolia, base, baseSepolia, arbitrum, arbitrumSepolia, localhost], // Include localhost for Anvil/Hardhat
   ssr: false, // Set to true if using server-side rendering

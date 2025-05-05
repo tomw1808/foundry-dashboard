@@ -1,10 +1,10 @@
 {
-  "name": "forge-dashboard",
+  "name": "foundry-dashboard",
   "version": "0.1.0",
   "description": "A local dashboard for interacting with Foundry projects via browser wallets.",
-  "main": "dist/server/server.js", 
+  "main": "dist/server/server.js",
   "bin": {
-    "forge-dashboard": "./dist/bin/forge-dashboard.js" 
+    "foundry-dashboard": "./dist/bin/foundry-dashboard.js"
   },
   "scripts": {
     "server": "node dist/server/server.js", 

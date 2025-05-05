@@ -1,12 +1,14 @@
-# Forge Dashboard ⚡️🦊
+# Foundry Dashboard ⚡️🦊
 
-![Forge Dashboard](images/image-1.png)
+![Foundry Dashboard](images/image-1.png)
 
 **Bring the power of browser wallets like MetaMask to your Foundry workflow.**
 
+*(Note: This is an unofficial community project inspired by Truffle Dashboard and is not affiliated with the official Foundry team.)*
+
 Ever missed the convenience of Truffle Dashboard when working with Foundry? Wished you could use your familiar browser wallet to sign transactions triggered by `forge script --broadcast` without juggling private keys or complex setups?
 
-Forge Dashboard aims to bridge that gap. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet.
+Foundry Dashboard aims to bridge that gap. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet.
 
 ## The Problem Solved 🧩
 
@@ -16,15 +18,15 @@ Tools like Truffle Dashboard provided a neat solution by letting developers use 
 
 ## How it Works ⚙️
 
-Forge Dashboard runs a small local server that does three main things:
+Foundry Dashboard runs a small local server that does three main things:
 
-1.  **Listens for JSON-RPC Requests:** It exposes a local RPC endpoint (e.g., `http://localhost:3001/api/rpc`). You point `forge script` or other tools to this endpoint using the `--rpc-url` flag. (don't forget `--sender <YourAddress> --unlocked`!)
+1.  **Listens for JSON-RPC Requests:** It exposes a local RPC endpoint (e.g., `http://localhost:3001/api/rpc`). You point `forge script` or other tools to this endpoint using the `--rpc-url` flag.
 2.  **Decodes Transaction Data:** When run within a Foundry project context, the server reads your compiled contract artifacts (`./out` directory) and attempts to decode `eth_sendTransaction` requests into human-readable function calls or contract deployments.
 3.  **Communicates with a Frontend:** It serves a simple web interface that connects to your browser wallet (MetaMask, etc.) via WebSocket.
 
 When `forge script` needs to send a transaction (`eth_sendTransaction`), the flow is:
 
-1.  `forge script` sends the request to the Forge Dashboard server (`/api/rpc`).
+1.  `forge script` sends the request to the Foundry Dashboard server (`/api/rpc`).
 2.  The server attempts to decode the transaction data using the ABIs found in the specified project path.
 3.  The server pushes the request (including any decoded information) via WebSocket to the connected web frontend.
 4.  The frontend displays the request details (decoded, if possible) and prompts you to approve or reject.
@@ -49,7 +51,7 @@ We considered several approaches before settling on the current architecture (No
 
 1.  **Installation:**
     ```bash
-    npm install -g forge-dashboard
+    npm install -g foundry-dashboard
     # or if cloned locally:
     # npm install && npm run build
     ```
@@ -58,7 +60,7 @@ We considered several approaches before settling on the current architecture (No
     *   Navigate to your Foundry project directory in your terminal.
     *   Run the dashboard command:
         ```bash
-        forge-dashboard
+        foundry-dashboard
         ```
     *   This starts the server (defaulting to port 3001) and opens the dashboard UI in your browser. It will automatically look for artifacts in `./out`.
 
@@ -69,7 +71,7 @@ We considered several approaches before settling on the current architecture (No
     *Example:*
     ```bash
     # Run on port 4000, pointing to a specific project
-    forge-dashboard --port 4000 --path /path/to/my-foundry-project
+    foundry-dashboard --port 4000 --path /path/to/my-foundry-project
     ```
 
 4.  **Connecting from Foundry:**
@@ -88,7 +90,7 @@ We considered several approaches before settling on the current architecture (No
 
 ## Transaction Decoding 🧐
 
-Forge Dashboard enhances the signing experience by attempting to decode transaction data (`eth_sendTransaction`) into a more human-readable format, similar to Truffle Dashboard.
+Foundry Dashboard enhances the signing experience by attempting to decode transaction data (`eth_sendTransaction`) into a more human-readable format, similar to Truffle Dashboard.
 
 *   **How it Works:** When started, the backend server reads contract artifacts (`.json` files containing ABIs and bytecode) from your Foundry project's output directory (usually `./out`, configurable via `--path`).
 *   **Function Calls:** For transactions targeting a contract (`to` address is present), it tries to match the transaction `data` against the function signatures in the loaded ABIs. If successful, it displays the contract name, function name, and decoded arguments.

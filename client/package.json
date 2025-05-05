@@ -1,5 +1,5 @@
 {
-  "name": "forge-dashboard-client",
+  "name": "foundry-dashboard-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
