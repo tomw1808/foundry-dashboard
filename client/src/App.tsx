@@ -30,16 +30,55 @@ type DecodedInfo = DecodedDeploymentInfo | DecodedFunctionInfo;
 
 type SignRequest = { requestId: string; payload: RpcPayload };
 
+// Define type for tracked transaction info
+interface TrackedTxInfo {
+    hash: Hex;
+    status: 'pending' | 'success' | 'reverted' | 'checking'; // Add 'checking' state
+    confirmations: number;
+    blockNumber?: bigint | null;
+    contractAddress?: Address | null;
+    timestamp: number; // When it was added
+    chainId: number; // Chain it was submitted on
+}
+
+// --- Helper: Block Explorer URLs ---
+const BLOCK_EXPLORER_URLS: Record<number, string> = {
+    1: 'https://etherscan.io',
+    11155111: 'https://sepolia.etherscan.io',
+    10: 'https://optimistic.etherscan.io',
+    137: 'https://polygonscan.com',
+    8453: 'https://basescan.org',
+    // Add more chains as needed
+};
+
+function getExplorerLink(chainId: number, type: 'tx' | 'address', hashOrAddress: string): string | null {
+    const baseUrl = BLOCK_EXPLORER_URLS[chainId];
+    if (!baseUrl) return null;
+    return `${baseUrl}/${type}/${hashOrAddress}`;
+}
+
+// --- Helper: Copy to Clipboard ---
+const copyToClipboard = async (text: string | undefined | null) => {
+    if (!text) return;
+    try {
+        await navigator.clipboard.writeText(text);
+        console.log('Copied to clipboard:', text); // TODO: Add user feedback (e.g., toast)
+    } catch (err) {
+        console.error('Failed to copy:', err);
+    }
+};
+
 
 function App() {
   const { address, chainId, isConnected } = useAccount();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient(); // Get wallet client for signing
+  const publicClient = usePublicClient({ chainId }); // Ensure publicClient uses current chainId
+  const { data: walletClient } = useWalletClient();
   const wsRef = useRef<WebSocket | null>(null);
-  // const [messages, setMessages] = useState<any[]>([]); // Keep log minimal now
   const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
-  const [processedRequests, setProcessedRequests] = useState(0); // Counter
+  const [processedRequests, setProcessedRequests] = useState(0);
+  const [trackedTxs, setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
+  const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -100,6 +139,111 @@ function App() {
       socket.close();
     };
   }, []); // Run only once on component mount
+
+
+  // --- Transaction Receipt Polling Effect ---
+  const POLLING_INTERVAL = 4000; // Check every 4 seconds
+
+  useEffect(() => {
+      if (!publicClient || trackedTxs.size === 0 || !chainId) {
+          return; // No client, nothing to track, or chainId missing
+      }
+
+      const intervalId = setInterval(async () => {
+          const pendingHashes = Array.from(trackedTxs.entries())
+              .filter(([_, tx]) => (tx.status === 'pending' || tx.status === 'checking') && tx.chainId === chainId) // Only poll for current chain
+              .map(([hash, _]) => hash);
+
+          if (pendingHashes.length === 0) return;
+
+          console.trace(`Polling receipts for ${pendingHashes.length} transactions on chain ${chainId}...`);
+
+          for (const hash of pendingHashes) {
+              const txInfo = trackedTxs.get(hash);
+              // Double check it's still pending/checking before fetching
+              if (!txInfo || (txInfo.status !== 'pending' && txInfo.status !== 'checking')) {
+                  continue;
+              }
+
+              // Mark as checking to avoid simultaneous fetches if interval is short
+              setTrackedTxs(prevMap => {
+                  const current = prevMap.get(hash);
+                  // Ensure it hasn't been updated by another process in the meantime
+                  if (current && (current.status === 'pending' || current.status === 'checking')) {
+                      return new Map(prevMap).set(hash, { ...current, status: 'checking' });
+                  }
+                  return prevMap; // No change needed
+              });
+
+
+              try {
+                  // Use the publicClient specific to the tx chainId if possible, else current
+                  // Note: This example uses the current publicClient, assuming polling only happens for the active chain.
+                  // For multi-chain support, you'd need clients per chainId.
+                  const receipt = await publicClient.getTransactionReceipt({ hash });
+
+                  if (receipt) {
+                      console.debug(`Receipt found for ${hash}: Status ${receipt.status}`);
+                      setTrackedTxs(prevMap => {
+                          const currentTx = prevMap.get(hash);
+                          if (!currentTx) return prevMap; // Should exist, but safety check
+                          return new Map(prevMap).set(hash, {
+                              ...currentTx,
+                              status: receipt.status, // 'success' or 'reverted'
+                              blockNumber: receipt.blockNumber,
+                              contractAddress: receipt.contractAddress,
+                          });
+                      });
+                      // Stop polling for this one once receipt is found
+                  } else {
+                      // Still pending, reset status from 'checking' back to 'pending'
+                      setTrackedTxs(prevMap => {
+                           const currentTx = prevMap.get(hash);
+                           if (!currentTx || currentTx.status !== 'checking') return prevMap;
+                           return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+                      });
+                  }
+              } catch (error: any) {
+                  console.warn({ err: error, hash }, `Error fetching receipt for tx`);
+                  // Reset status back to pending on error to allow retry
+                   setTrackedTxs(prevMap => {
+                       const currentTx = prevMap.get(hash);
+                       if (!currentTx || currentTx.status !== 'checking') return prevMap;
+                       return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+                  });
+              }
+          }
+      }, POLLING_INTERVAL);
+
+      return () => clearInterval(intervalId); // Cleanup interval on unmount or dependency change
+
+  }, [trackedTxs, publicClient, chainId]); // Re-run if trackedTxs, client or chain changes
+
+
+  // --- Block Number Watching Effect ---
+  useWatchBlockNumber({
+      onBlockNumber(blockNumber) {
+          console.trace(`New block received: ${blockNumber}`);
+          setCurrentBlockNumber(blockNumber);
+          // Update confirmations for already confirmed transactions
+          setTrackedTxs(prevMap => {
+              const newMap = new Map(prevMap);
+              let changed = false;
+              newMap.forEach((tx, hash) => {
+                  // Only update confirmations if the tx is on the current chain
+                  if (tx.chainId === chainId && (tx.status === 'success' || tx.status === 'reverted') && tx.blockNumber) {
+                      const confs = Number(blockNumber - tx.blockNumber) + 1; // Calculate confirmations
+                      if (tx.confirmations !== confs) {
+                          newMap.set(hash, { ...tx, confirmations: confs });
+                          changed = true;
+                      }
+                  }
+              });
+              return changed ? newMap : prevMap; // Return new map only if changed
+          });
+      },
+  });
+
 
   // --- RPC Request Handling ---
   const handleRpcRequest = async (requestId: string, payload: { method: string; params: any[]; id: number | string }) => {
@@ -319,6 +463,22 @@ function App() {
          // } else { ... }
          throw new Error(`Unsupported signing method: ${payload.method}`);
       }
+
+      const txHash = result as Hex;
+      const currentChainId = chainId; // Capture current chainId
+
+      if (txHash && currentChainId) {
+          const newTrackedTx: TrackedTxInfo = {
+              hash: txHash,
+              status: 'pending',
+              confirmations: 0,
+              timestamp: Date.now(),
+              chainId: currentChainId,
+          };
+          // Update state immutably
+          setTrackedTxs(prevMap => new Map(prevMap).set(txHash, newTrackedTx));
+      }
+      // --- End Add to Tracked Txs ---
 
       // Remove the request from the UI *before* sending the response
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
