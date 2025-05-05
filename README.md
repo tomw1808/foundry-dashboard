@@ -1,5 +1,7 @@
 # Forge Dashboard ⚡️🦊
 
+![Forge Dashboard](images/image-1.png)
+
 **Bring the power of browser wallets like MetaMask to your Foundry workflow.**
 
 Ever missed the convenience of Truffle Dashboard when working with Foundry? Wished you could use your familiar browser wallet to sign transactions triggered by `forge script --broadcast` without juggling private keys or complex setups?
@@ -16,7 +18,7 @@ Tools like Truffle Dashboard provided a neat solution by letting developers use 
 
 Forge Dashboard runs a small local server that does three main things:
 
-1.  **Listens for JSON-RPC Requests:** It exposes a local RPC endpoint (e.g., `http://localhost:3001/api/rpc`). You point `forge script` or other tools to this endpoint using the `--rpc-url` flag.
+1.  **Listens for JSON-RPC Requests:** It exposes a local RPC endpoint (e.g., `http://localhost:3001/api/rpc`). You point `forge script` or other tools to this endpoint using the `--rpc-url` flag. (don't forget `--sender <YourAddress> --unlocked`!)
 2.  **Decodes Transaction Data:** When run within a Foundry project context, the server reads your compiled contract artifacts (`./out` directory) and attempts to decode `eth_sendTransaction` requests into human-readable function calls or contract deployments.
 3.  **Communicates with a Frontend:** It serves a simple web interface that connects to your browser wallet (MetaMask, etc.) via WebSocket.
 
