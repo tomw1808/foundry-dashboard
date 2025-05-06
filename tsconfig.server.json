@@ -1,30 +1,25 @@
 {
   "compilerOptions": {
-    /* Base Options: */
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "target": "ES2022", // Target modern Node.js versions
+    "target": "ES2022",
     "allowJs": true,
     "resolveJsonModule": true,
     "moduleDetection": "force",
     "isolatedModules": true,
-    /* Strictness */
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitAny": true,
-    /* If NOT transpiling with TypeScript: */
-    // "module": "preserve",
-    // "noEmit": true,
-    /* If your code runs directly in Node.js, adjust module-related settings */
-    "module": "CommonJS", // Output CommonJS for Node compatibility by default
-    "outDir": "./dist", // Output compiled JS to 'dist' folder
-    "sourceMap": true, // Generate source maps for debugging
-    /* Alias configuration (optional, if needed) */
-    // "baseUrl": ".",
-    // "paths": {
-    //   "@/*": ["./src/*"]
-    // }
+    "module": "CommonJS",
+    "outDir": "./dist",
+    "sourceMap": true,
   },
-  "include": ["server/**/*.ts", "bin/**/*.ts"], // Files to include
-  "exclude": ["node_modules", "client"] // Folders to exclude
+  "include": [
+    "server/**/*.ts",
+    "bin/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "client"
+  ]
 }
