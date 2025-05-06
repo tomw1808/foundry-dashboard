@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.4...v1.1.5) (2025-05-06)
+
+
+### Bug Fixes
+
+* removed comments from json files ([13affc7](https://github.com/tomw1808/foundry-dashboard/commit/13affc7b76f17ebd84b7affb82364f02504f75a4))
+
 ## [1.1.4](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.3...v1.1.4) (2025-05-05)
 
 
