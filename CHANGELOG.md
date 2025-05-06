@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.3...v1.1.4) (2025-05-05)
+
+
+### Bug Fixes
+
+* move pino-pretty into dependencies ([004ba82](https://github.com/tomw1808/foundry-dashboard/commit/004ba8283123a16b85eb8e2155649a60b9aedc9f))
+
 ## [1.1.3](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.2...v1.1.3) (2025-05-05)
 
 
