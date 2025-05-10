@@ -9,18 +9,31 @@ import { DashboardHeader } from '@/components/DashboardHeader';
 import { DashboardStatus } from '@/components/DashboardStatus';
 import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
+import { Switch } from '@/components/ui/switch'; // Assuming you have a Switch component (e.g., from shadcn)
+import { Label } from '@/components/ui/label';   // Assuming you have a Label component
+
+// --- Configuration Constants for Candide EIP-7702 ---
+// TODO: Replace with your actual Candide API keys if they are different from public/demo ones
+const CANDIDE_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+const CANDIDE_SEPOLIA_BUNDLER_URL = "YOUR_CANDIDE_SEPOLIA_BUNDLER_URL_OR_API_KEY_ENDPOINT"; // e.g., https://api.candide.dev/bundler/v3/sepolia/YOUR_API_KEY
+const CANDIDE_SEPOLIA_PAYMASTER_URL = "YOUR_CANDIDE_SEPOLIA_PAYMASTER_URL_OR_API_KEY_ENDPOINT"; // e.g., https://api.candide.dev/paymaster/v3/sepolia/YOUR_API_KEY
+// Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
+const CANDIDE_ENTRY_POINT_ADDRESS = "0x0000000071727De22E5E9d8bAF0edAc6f37da032";
+// Default delegatee for Simple7702Account
+const SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS = "0xe6Cae83BdE06E4c305530e199D7217f42808555B" as Address;
 
 
 function App() {
   // --- Hooks ---
   const { address, chainId, isConnected } = useAccount();
-  const publicClient = usePublicClient({ chainId }); // Ensure publicClient uses current chainId
+  const publicClient = usePublicClient({ chainId });
   const { data: walletClient } = useWalletClient();
   const wsRef = useRef<WebSocket | null>(null);
   const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
   const [processedRequests, setProcessedRequests] = useState(0);
   const [trackedTxs, setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
+  const [isEip7702Enabled, setIsEip7702Enabled] = useState(false); // State for EIP-7702 toggle
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -434,6 +447,23 @@ function App() {
       <DashboardHeader />
 
       <main className="w-full max-w-4xl mt-8 p-4 bg-gray-800 rounded shadow-lg">
+        <h2 className="text-xl mb-4">Dashboard Status</h2>
+        <h2 className="text-xl mb-4">Settings</h2>
+        <div className="flex items-center space-x-2 mb-6 p-3 bg-gray-700 rounded-md">
+            <Switch
+                id="eip7702-toggle"
+                checked={isEip7702Enabled}
+                onCheckedChange={setIsEip7702Enabled}
+                disabled={!isConnected || chainId !== 11155111} // Example: Enable only for Sepolia and when connected
+            />
+            <Label htmlFor="eip7702-toggle" className="text-sm font-medium">
+                Enable EIP-7702 Gasless Transactions (Sepolia Only)
+            </Label>
+            {(!isConnected || chainId !== 11155111) && isEip7702Enabled && (
+                 <p className="text-xs text-yellow-400 ml-2">Connect to Sepolia to use EIP-7702 mode.</p>
+            )}
+        </div>
+
         <h2 className="text-xl mb-4">Dashboard Status</h2>
         <DashboardStatus
             wsStatus={wsStatus}
