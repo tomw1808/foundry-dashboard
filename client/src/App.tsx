@@ -328,41 +328,72 @@ function App() {
     const { requestId, payload } = request;
     const currentWs = wsRef.current;
 
-    console.log(`Attempting to sign request ${requestId} for method ${payload.method}`); // Log less verbosely
+    console.log(`Attempting to sign request ${requestId} for method ${payload.method}, EIP7702: ${isEip7702Enabled}`);
 
-    if (!walletClient || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
-      const reason = !walletClient ? 'Wallet client not available' : 'WebSocket not open';
+    if (!walletClient || !currentWs || currentWs.readyState !== WebSocket.OPEN || !address || !chainId || !publicClient) {
+      const reason = !walletClient ? 'Wallet client not available'
+                   : !currentWs || currentWs.readyState !== WebSocket.OPEN ? 'WebSocket not open'
+                   : !address ? 'EOA address not available'
+                   : !chainId ? 'Chain ID not available'
+                   : 'Public client not available';
       console.error(`${reason}, cannot sign transaction for ${requestId}`);
-      // Optionally send error back if possible
       if (currentWs && currentWs.readyState === WebSocket.OPEN) {
          sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
       }
-      // Remove the request from UI even if we can't send error
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
       return;
     }
 
     try {
       let result: any;
-      // Assuming eth_sendTransaction is the primary signing method for now
-      if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
+
+      if (isEip7702Enabled && chainId === 11155111) { // Only for Sepolia for now
+        // --- EIP-7702 Flow ---
+        console.log(`[${requestId}] Starting EIP-7702 flow...`);
+        if (payload.method !== 'eth_sendTransaction' || !payload.params?.[0]) {
+            throw new Error("EIP-7702 flow currently only supports eth_sendTransaction.");
+        }
         const rawTx = payload.params[0] as any;
-
-        // --- Sanitize the transaction object using the utility function ---
         const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
-        // --- ---
 
-        console.log(`[${requestId}] Sanitized transaction object being sent:`, JSON.stringify(sanitizedTx, (_key, value) =>
-            typeof value === 'bigint' ? value.toString() : value // Convert BigInts for logging
-        , 2));
+        if (!sanitizedTx.to) { // Contract Creation
+            console.error(`[${requestId}] Contract creation is not supported in EIP-7702 mode yet.`);
+            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "Contract creation via EIP-7702 is not yet supported. Use a factory or disable EIP-7702 mode." } });
+            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+            return;
+        }
 
-        // Always use viem's walletClient now
-        console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
-        result = await walletClient.sendTransaction(sanitizedTx);
-        console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
+        // TODO: Implement full EIP-7702 logic here (Steps from previous plan)
+        // 1. Instantiate Simple7702Account
+        // 2. Prepare MetaTransaction
+        // 3. Prepare & Sign EIP-7702 Authorization
+        // 4. Create UserOperation (abstractionkit)
+        // 5. Paymaster Sponsorship (abstractionkit)
+        // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
+        // 7. Send UserOperation (abstractionkit)
+        // 8. Track UserOperation (initial update to trackedTxs)
+        // 9. Asynchronously update tracking with inclusion result
+
+        // Placeholder result for now
+        result = `eip7702_user_op_placeholder_for_${requestId}`; // Replace with actual UserOpHash
+        console.warn(`[${requestId}] EIP-7702 flow not fully implemented. Placeholder result: ${result}`);
+        // For now, we'll just send back a placeholder and not actually submit.
 
       } else {
-         // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
+        // --- Standard Flow (Non-EIP-7702) ---
+        if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
+            const rawTx = payload.params[0] as any;
+            const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
+
+            console.log(`[${requestId}] Sanitized transaction object for standard flow:`, JSON.stringify(sanitizedTx, (_key, value) =>
+                typeof value === 'bigint' ? value.toString() : value
+            , 2));
+
+            console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
+            result = await walletClient.sendTransaction(sanitizedTx);
+            console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
+        } else {
+            // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
          // Example:
          // if (payload.method === 'personal_sign' && payload.params?.[0] && payload.params?.[1]) {
          //   const message = payload.params[0];
