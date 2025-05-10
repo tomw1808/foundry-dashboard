@@ -347,40 +347,42 @@ function App() {
     try {
       let result: any;
 
-      if (isEip7702Enabled && chainId === 11155111) { // Only for Sepolia for now
-        // --- EIP-7702 Flow ---
-        console.log(`[${requestId}] Starting EIP-7702 flow...`);
-        if (payload.method !== 'eth_sendTransaction' || !payload.params?.[0]) {
-            throw new Error("EIP-7702 flow currently only supports eth_sendTransaction.");
-        }
-        const rawTx = payload.params[0] as any;
-        const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
+      // if (isEip7702Enabled && chainId === 11155111) { // Only for Sepolia for now
+      //   // --- EIP-7702 Flow ---
+      //   console.log(`[${requestId}] Starting EIP-7702 flow...`);
+      //   if (payload.method !== 'eth_sendTransaction' || !payload.params?.[0]) {
+      //       throw new Error("EIP-7702 flow currently only supports eth_sendTransaction.");
+      //   }
+      //   const rawTx = payload.params[0] as any;
+      //   const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
 
-        if (!sanitizedTx.to) { // Contract Creation
-            console.error(`[${requestId}] Contract creation is not supported in EIP-7702 mode yet.`);
-            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "Contract creation via EIP-7702 is not yet supported. Use a factory or disable EIP-7702 mode." } });
-            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-            return;
-        }
+      //   if (!sanitizedTx.to) { // Contract Creation
+      //       console.error(`[${requestId}] Contract creation is not supported in EIP-7702 mode yet.`);
+      //       sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "Contract creation via EIP-7702 is not yet supported. Use a factory or disable EIP-7702 mode." } });
+      //       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+      //       return;
+      //   }
 
-        // TODO: Implement full EIP-7702 logic here (Steps from previous plan)
-        // 1. Instantiate Simple7702Account
-        // 2. Prepare MetaTransaction
-        // 3. Prepare & Sign EIP-7702 Authorization
-        // 4. Create UserOperation (abstractionkit)
-        // 5. Paymaster Sponsorship (abstractionkit)
-        // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
-        // 7. Send UserOperation (abstractionkit)
-        // 8. Track UserOperation (initial update to trackedTxs)
-        // 9. Asynchronously update tracking with inclusion result
+      //   // TODO: Implement full EIP-7702 logic here (Steps from previous plan)
+      //   // 1. Instantiate Simple7702Account
+      //   // 2. Prepare MetaTransaction
+      //   // 3. Prepare & Sign EIP-7702 Authorization
+      //   // 4. Create UserOperation (abstractionkit)
+      //   // 5. Paymaster Sponsorship (abstractionkit)
+      //   // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
+      //   // 7. Send UserOperation (abstractionkit)
+      //   // 8. Track UserOperation (initial update to trackedTxs)
+      //   // 9. Asynchronously update tracking with inclusion result
 
-        // Placeholder result for now
-        result = `eip7702_user_op_placeholder_for_${requestId}`; // Replace with actual UserOpHash
-        console.warn(`[${requestId}] EIP-7702 flow not fully implemented. Placeholder result: ${result}`);
-        // For now, we'll just send back a placeholder and not actually submit.
+      //   // Placeholder result for now
+      //   result = `eip7702_user_op_placeholder_for_${requestId}`; // Replace with actual UserOpHash
+      //   console.warn(`[${requestId}] EIP-7702 flow not fully implemented. Placeholder result: ${result}`);
+      //   // For now, we'll just send back a placeholder and not actually submit.
 
-      } else {
+      // } else {
         // --- Standard Flow (Non-EIP-7702) ---
+        // Ensure the 'else' is also commented if the 'if' is, or adjust logic
+        // For now, let's assume standard flow is always active if EIP-7702 is commented out
         if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
             const rawTx = payload.params[0] as any;
             const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
