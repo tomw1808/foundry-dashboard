@@ -356,10 +356,22 @@ function App() {
                    : !chainId ? 'Chain ID not available'
                    : 'Public client not available';
       console.error(`${reason}, cannot sign transaction for ${requestId}`);
+      // Send error response only if WS is available
       if (currentWs && currentWs.readyState === WebSocket.OPEN) {
          sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
       }
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+      return;
+    }
+
+    // Check for EIP-7702 configuration if mode is enabled
+    if (isEip7702Enabled && chainId === 11155111 && !areCandideUrlsConfigured) {
+        const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
+        console.error(`[${requestId}] ${configErrorMessage}`);
+        setEip7702ConfigError(configErrorMessage); // Show error to user
+        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
+        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        setIsEip7702Enabled(false); // Disable toggle as it's misconfigured
       return;
     }
 
