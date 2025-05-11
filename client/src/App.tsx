@@ -434,8 +434,17 @@ function App() {
         ) as UserOperationV8;
         console.debug({ userOp: userOperation }, "UserOperation created by abstractionkit");
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.8 onwards)
-        // 5. Paymaster Sponsorship (abstractionkit)
+        // Paymaster Sponsorship (using abstractionkit) (MD step 4.2.8)
+        console.debug("Applying paymaster sponsorship with CandidePaymaster...");
+        const paymaster = new CandidePaymaster(CANDIDE_SEPOLIA_PAYMASTER_URL);
+        const [paymasterUserOperation, sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+            userOperation,
+            CANDIDE_SEPOLIA_BUNDLER_URL, // Bundler URL is needed by the paymaster service
+        );
+        userOperation = paymasterUserOperation as UserOperationV8; // Update userOperation with paymaster data
+        console.debug({ userOp: userOperation, sponsorMeta: sponsorMetadata }, "UserOperation after paymaster sponsorship");
+
+        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.9 onwards)
         // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
         // 7. Send UserOperation (abstractionkit)
         // 8. Track UserOperation (initial update to trackedTxs)
