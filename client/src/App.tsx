@@ -383,8 +383,32 @@ function App() {
         };
         console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702");
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.6 onwards)
-        // 3. Prepare & Sign EIP-7702 Authorization
+        // Prepare & Sign EIP-7702 Authorization (MD step 4.2.6)
+        const eoaNonceForAuth = await publicClient.getTransactionCount({ address, blockTag: 'pending' });
+        const designatedContractAddress = SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS;
+
+        console.debug(`Signing EIP-7702 Auth: EOA=${address}, DesignatedContract=${designatedContractAddress}, EOAAuthNonce=${eoaNonceForAuth}`);
+        const eip7702FullSignature = await walletClient.signAuthorization({
+            account: address,
+            contractAddress: designatedContractAddress,
+            nonce: eoaNonceForAuth,
+            chainId: BigInt(chainId),
+            // authority & executor: Using viem defaults.
+        });
+
+        const { r, s, yParity } = parseSignature(eip7702FullSignature);
+
+        const eip7702AuthForUserOpOverride = { // Matches Authorization7702Hex structure
+            chainId: bigintToHexAK(BigInt(chainId)),
+            address: address,
+            nonce: bigintToHexAK(eoaNonceForAuth),
+            yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01',
+            r: r as Hex,
+            s: s as Hex,
+        };
+        console.debug({ authData: eip7702AuthForUserOpOverride }, "Prepared EIP-7702 Auth data for UserOp override");
+
+        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.7 onwards)
         // 4. Create UserOperation (abstractionkit)
         // 5. Paymaster Sponsorship (abstractionkit)
         // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
