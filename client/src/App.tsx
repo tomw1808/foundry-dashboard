@@ -461,15 +461,15 @@ function App() {
         userOperation.signature = userOpSignature;
         console.debug(`UserOperation signature obtained: ${userOpSignature}`);
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.10 onwards)
-        // 7. Send UserOperation (abstractionkit)
-        // 8. Track UserOperation (initial update to trackedTxs)
-        // 9. Asynchronously update tracking with inclusion result
+        // Send UserOperation (using abstractionkit) (MD step 4.2.10)
+        console.debug("Sending UserOperation to bundler...");
+        const sendUserOpResponse = await smartAccount.sendUserOperation(userOperation, CANDIDE_SEPOLIA_BUNDLER_URL);
+        console.info(`UserOperation sent. UserOpHash from sendUserOpResponse: ${sendUserOpResponse.userOperationHash}`);
+        result = sendUserOpResponse.userOperationHash; // Store UserOpHash as the initial result
 
-        // Placeholder result for now
-        result = `eip7702_user_op_placeholder_for_${requestId}`; // Replace with actual UserOpHash
-        console.warn(`[${requestId}] EIP-7702 flow not fully implemented. Placeholder result: ${result}`);
-        // For now, we'll just send back a placeholder and not actually submit.
+        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.11 onwards - tracking)
+        // The next step is to handle the asynchronous update of tracking with the inclusion result.
+        // The initial tracking entry is handled by the common success logic below.
 
       } else {
         // --- Standard Flow (Non-EIP-7702 or conditions not met) ---
