@@ -402,7 +402,7 @@ function App() {
             chainId: bigintToHexAK(BigInt(chainId)),
             address: address,
             nonce: bigintToHexAK(eoaNonceForAuth),
-            yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01',
+            yParity: yParity === 0 ? '0x00' : '0x01' as '0x00' | '0x01',
             r: r as Hex,
             s: s as Hex,
         };
