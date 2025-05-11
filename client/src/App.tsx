@@ -375,8 +375,15 @@ function App() {
             { entrypointAddress: CANDIDE_ENTRY_POINT_ADDRESS }
         );
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.5 onwards)
-        // 2. Prepare MetaTransaction
+        // Prepare MetaTransaction (MD step 4.2.5)
+        const metaTx: SimpleMetaTransaction = {
+            to: sanitizedTx.to as Address, // We've ensured 'to' exists
+            value: sanitizedTx.value || 0n,
+            data: sanitizedTx.data || "0x",
+        };
+        console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702");
+
+        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.6 onwards)
         // 3. Prepare & Sign EIP-7702 Authorization
         // 4. Create UserOperation (abstractionkit)
         // 5. Paymaster Sponsorship (abstractionkit)
