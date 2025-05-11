@@ -444,8 +444,24 @@ function App() {
         userOperation = paymasterUserOperation as UserOperationV8; // Update userOperation with paymaster data
         console.debug({ userOp: userOperation, sponsorMeta: sponsorMetadata }, "UserOperation after paymaster sponsorship");
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.9 onwards)
-        // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
+        // Sign UserOperation (for Simple7702Account) (MD step 4.2.9)
+        console.debug("Getting UserOperation hash for signing...");
+        const userOpHash = await smartAccount.getUserOperationHash(
+            userOperation,
+            CANDIDE_ENTRY_POINT_ADDRESS, // Ensure this matches the entrypoint Simple7702Account uses
+            BigInt(chainId)
+        );
+        console.debug(`UserOperation hash to sign: ${userOpHash}`);
+
+        console.debug("Signing UserOperation hash with walletClient...");
+        const userOpSignature = await walletClient.signMessage({
+            account: address,
+            message: { raw: userOpHash as Hex }, // message can be string or { raw: Hex }
+        });
+        userOperation.signature = userOpSignature;
+        console.debug(`UserOperation signature obtained: ${userOpSignature}`);
+
+        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.10 onwards)
         // 7. Send UserOperation (abstractionkit)
         // 8. Track UserOperation (initial update to trackedTxs)
         // 9. Asynchronously update tracking with inclusion result
