@@ -5,7 +5,7 @@ import { Address, BlockTag, Hex } from 'viem';
 // Import types and components
 import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types';
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
-import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster } from "abstractionkit"; // EIP-7702
+import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
 import { parseSignature } from 'viem'; // EIP-7702
 // Helper from abstractionkit or replicate its bigintToHex logic if needed for eip7702Auth object
 const bigintToHexAK = (val: bigint): Hex => ('0x' + (val === 0n ? '0' : val.toString(16))) as Hex; // EIP-7702
@@ -446,7 +446,7 @@ function App() {
 
         // Sign UserOperation (for Simple7702Account) (MD step 4.2.9)
         console.debug("Getting UserOperation hash for signing...");
-        const userOpHash = await smartAccount.getUserOperationHash(
+        const userOpHash = await createUserOperationHash(
             userOperation,
             CANDIDE_ENTRY_POINT_ADDRESS, // Ensure this matches the entrypoint Simple7702Account uses
             BigInt(chainId)

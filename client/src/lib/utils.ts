@@ -1,4 +1,10 @@
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 import { DecodedInfo } from "@/types"; // Assuming types are in src/types.ts
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
 
 // --- Helper: Block Explorer URLs ---
 const BLOCK_EXPLORER_URLS: Record<number, string> = {
