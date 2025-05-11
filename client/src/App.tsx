@@ -412,6 +412,7 @@ function App() {
          //   result = await walletClient.signMessage({ account, message });
          // } else { ... }
          throw new Error(`Unsupported signing method: ${payload.method}`);
+        }
       }
 
       const txHashOrUserOpHash = result as Hex; // This is UserOpHash for EIP-7702, TxHash for standard
