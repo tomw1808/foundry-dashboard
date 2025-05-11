@@ -402,7 +402,7 @@ function App() {
             chainId: BigInt(chainId), // Expected as bigint
             address: address,
             nonce: eoaNonceForAuth,   // Expected as bigint
-            yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Corrected to use 0n for bigint comparison
+            yParity: BigInt(yParity) === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Corrected to use 0n for bigint comparison
             r: r as Hex,
             s: s as Hex,
         };
