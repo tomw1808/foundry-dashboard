@@ -408,8 +408,33 @@ function App() {
         };
         console.debug({ authData: eip7702AuthForUserOpOverride }, "Prepared EIP-7702 Auth data for UserOp override");
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.7 onwards)
-        // 4. Create UserOperation (abstractionkit)
+        // Determine RPC URL for UserOperation creation (MD step 4.2.7 preparation)
+        // For now, this logic is Sepolia-specific due to CANDIDE_SEPOLIA_BUNDLER_URL and Paymaster later.
+        let rpcUrlForUserOp = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback for Sepolia
+        if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
+            const clientRpcUrl = publicClient.transport.config.url;
+            // Ensure the client's RPC URL is HTTP/S for abstractionkit compatibility
+            if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+                rpcUrlForUserOp = clientRpcUrl;
+                console.debug(`Using RPC URL from publicClient for UserOperation: ${rpcUrlForUserOp}`);
+            } else {
+                console.debug(`publicClient RPC URL (${clientRpcUrl}) is not HTTP/S. Falling back to CANDIDE_SEPOLIA_RPC_URL for UserOperation.`);
+            }
+        } else {
+            console.debug("publicClient RPC URL not available or not a string. Falling back to CANDIDE_SEPOLIA_RPC_URL for UserOperation.");
+        }
+
+        // Create UserOperation (using abstractionkit) (MD step 4.2.7)
+        console.debug(`Creating UserOperation with abstractionkit using RPC: ${rpcUrlForUserOp}, Bundler: ${CANDIDE_SEPOLIA_BUNDLER_URL}`);
+        let userOperation = await smartAccount.createUserOperation(
+            [metaTx],
+            rpcUrlForUserOp,
+            CANDIDE_SEPOLIA_BUNDLER_URL, // Bundler URL is still Sepolia-specific
+            { eip7702Auth: eip7702AuthForUserOpOverride }
+        ) as UserOperationV8;
+        console.debug({ userOp: userOperation }, "UserOperation created by abstractionkit");
+
+        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.8 onwards)
         // 5. Paymaster Sponsorship (abstractionkit)
         // 6. Sign UserOperation (abstractionkit hash + viem signMessage)
         // 7. Send UserOperation (abstractionkit)
