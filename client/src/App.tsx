@@ -398,11 +398,11 @@ function App() {
 
         const { r, s, yParity } = parseSignature(eip7702FullSignature);
 
-        const eip7702AuthForUserOpOverride = { // Matches Authorization7702Hex structure
-            chainId: bigintToHexAK(BigInt(chainId)),
+        const eip7702AuthForUserOpOverride = { // Structure for abstractionkit's eip7702Auth override
+            chainId: BigInt(chainId), // Expected as bigint
             address: address,
-            nonce: bigintToHexAK(eoaNonceForAuth),
-            yParity: yParity === 0 ? '0x00' : '0x01' as '0x00' | '0x01',
+            nonce: eoaNonceForAuth,   // Expected as bigint
+            yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Corrected to use 0n for bigint comparison
             r: r as Hex,
             s: s as Hex,
         };
