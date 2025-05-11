@@ -43,7 +43,9 @@ export interface TrackedTxInfo {
     contractAddress?: Address | null;
     timestamp: number;
     chainId: number;
-    label: string; // Description of the transaction
+    label: string;
+    actualTxHash?: Hex; // For UserOps, the final transaction hash
+    // userOpHash?: Hex; // We'll use 'hash' to store UserOpHash initially for EIP-7702
 }
 
 // Type for WebSocket status display

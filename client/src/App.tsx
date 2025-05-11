@@ -405,21 +405,25 @@ function App() {
          throw new Error(`Unsupported signing method: ${payload.method}`);
       }
 
-      const txHash = result as Hex;
-      const currentChainId = chainId; // Capture current chainId
-      const decodedInfo = request.payload.decoded; // Get decoded info from original request
+      const txHashOrUserOpHash = result as Hex; // This is UserOpHash for EIP-7702, TxHash for standard
+      const currentChainId = chainId;
+      const decodedInfo = request.payload.decoded;
 
-      if (txHash && currentChainId) {
+      if (txHashOrUserOpHash && currentChainId) {
+          const txLabel = isEip7702Enabled && chainId === 11155111
+              ? `EIP-7702: ${generateTxLabel(decodedInfo)} (UserOp)`
+              : generateTxLabel(decodedInfo);
+
           const newTrackedTx: TrackedTxInfo = {
-              hash: txHash,
+              hash: txHashOrUserOpHash, // Store UserOpHash for EIP-7702, TxHash for standard
               status: 'pending',
               confirmations: 0,
               timestamp: Date.now(),
               chainId: currentChainId,
-              label: generateTxLabel(decodedInfo), // Generate and store the label
+              label: txLabel,
+              // actualTxHash will be filled later for UserOps
           };
-          // Update state immutably
-          setTrackedTxs(prevMap => new Map(prevMap).set(txHash, newTrackedTx));
+          setTrackedTxs(prevMap => new Map(prevMap).set(txHashOrUserOpHash, newTrackedTx));
       }
       // --- End Add to Tracked Txs ---
 
