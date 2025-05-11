@@ -5,7 +5,7 @@ import { Address, BlockTag, Hex } from 'viem';
 // Import types and components
 import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types';
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
-import { Simple7702Account, UserOperationV8, SimpleMetaTransaction, CandidePaymaster } from "abstractionkit"; // EIP-7702
+import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster } from "abstractionkit"; // EIP-7702
 import { parseSignature } from 'viem'; // EIP-7702
 // Helper from abstractionkit or replicate its bigintToHex logic if needed for eip7702Auth object
 const bigintToHexAK = (val: bigint): Hex => ('0x' + (val === 0n ? '0' : val.toString(16))) as Hex; // EIP-7702
@@ -376,7 +376,7 @@ function App() {
         );
 
         // Prepare MetaTransaction (MD step 4.2.5)
-        const metaTx: SimpleMetaTransaction = {
+        const metaTx: MetaTransaction = {
             to: sanitizedTx.to as Address, // We've ensured 'to' exists
             value: sanitizedTx.value || 0n,
             data: sanitizedTx.data || "0x",
