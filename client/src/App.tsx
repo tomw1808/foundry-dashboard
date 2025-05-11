@@ -17,10 +17,24 @@ import { Switch } from '@/components/ui/switch'; // Assuming you have a Switch c
 import { Label } from '@/components/ui/label';   // Assuming you have a Label component
 
 // --- Configuration Constants for Candide EIP-7702 ---
-// TODO: Replace with your actual Candide API keys if they are different from public/demo ones
-const CANDIDE_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
-const CANDIDE_SEPOLIA_BUNDLER_URL = "YOUR_CANDIDE_SEPOLIA_BUNDLER_URL_OR_API_KEY_ENDPOINT"; // e.g., https://api.candide.dev/bundler/v3/sepolia/YOUR_API_KEY
-const CANDIDE_SEPOLIA_PAYMASTER_URL = "YOUR_CANDIDE_SEPOLIA_PAYMASTER_URL_OR_API_KEY_ENDPOINT"; // e.g., https://api.candide.dev/paymaster/v3/sepolia/YOUR_API_KEY
+const CANDIDE_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com"; // Public RPC, can remain hardcoded or also be env var
+
+// Bundler and Paymaster URLs from Vite environment variables (see .env.example)
+// Fallback to placeholder strings for guidance if not set.
+const VITE_CANDIDE_SEPOLIA_BUNDLER_URL = import.meta.env.VITE_CANDIDE_SEPOLIA_BUNDLER_URL;
+const VITE_CANDIDE_SEPOLIA_PAYMASTER_URL = import.meta.env.VITE_CANDIDE_SEPOLIA_PAYMASTER_URL;
+
+const BUNDLER_URL_PLACEHOLDER = "YOUR_CANDIDE_SEPOLIA_BUNDLER_URL_OR_API_KEY_ENDPOINT";
+const PAYMASTER_URL_PLACEHOLDER = "YOUR_CANDIDE_SEPOLIA_PAYMASTER_URL_OR_API_KEY_ENDPOINT";
+
+const ACTUAL_BUNDLER_URL = VITE_CANDIDE_SEPOLIA_BUNDLER_URL || BUNDLER_URL_PLACEHOLDER;
+const ACTUAL_PAYMASTER_URL = VITE_CANDIDE_SEPOLIA_PAYMASTER_URL || PAYMASTER_URL_PLACEHOLDER;
+
+const areCandideUrlsConfigured =
+    ACTUAL_BUNDLER_URL !== BUNDLER_URL_PLACEHOLDER &&
+    ACTUAL_PAYMASTER_URL !== PAYMASTER_URL_PLACEHOLDER &&
+    !!ACTUAL_BUNDLER_URL && // Ensure they are not empty strings if env var is set to ""
+    !!ACTUAL_PAYMASTER_URL;
 // Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
 const CANDIDE_ENTRY_POINT_ADDRESS = "0x0000000071727De22E5E9d8bAF0edAc6f37da032";
 // Default delegatee for Simple7702Account
@@ -38,6 +52,7 @@ function App() {
   const [processedRequests, setProcessedRequests] = useState(0);
   const [trackedTxs, setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
   const [isEip7702Enabled, setIsEip7702Enabled] = useState(false); // State for EIP-7702 toggle
+  const [eip7702ConfigError, setEip7702ConfigError] = useState<string | null>(null); // Error message for EIP-7702 config
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -425,21 +440,21 @@ function App() {
         }
 
         // Create UserOperation (using abstractionkit) (MD step 4.2.7)
-        console.debug(`Creating UserOperation with abstractionkit using RPC: ${rpcUrlForUserOp}, Bundler: ${CANDIDE_SEPOLIA_BUNDLER_URL}`);
+        console.debug(`Creating UserOperation with abstractionkit using RPC: ${rpcUrlForUserOp}, Bundler: ${ACTUAL_BUNDLER_URL}`);
         let userOperation = await smartAccount.createUserOperation(
             [metaTx],
             rpcUrlForUserOp,
-            CANDIDE_SEPOLIA_BUNDLER_URL, // Bundler URL is still Sepolia-specific
+            ACTUAL_BUNDLER_URL, // Use configured Bundler URL
             { eip7702Auth: eip7702AuthForUserOpOverride }
         ) as UserOperationV8;
         console.debug({ userOp: userOperation }, "UserOperation created by abstractionkit");
 
         // Paymaster Sponsorship (using abstractionkit) (MD step 4.2.8)
         console.debug("Applying paymaster sponsorship with CandidePaymaster...");
-        const paymaster = new CandidePaymaster(CANDIDE_SEPOLIA_PAYMASTER_URL);
+        const paymaster = new CandidePaymaster(ACTUAL_PAYMASTER_URL); // Use configured Paymaster URL
         const [paymasterUserOperation, sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
             userOperation,
-            CANDIDE_SEPOLIA_BUNDLER_URL, // Bundler URL is needed by the paymaster service
+            ACTUAL_BUNDLER_URL, // Bundler URL is needed by the paymaster service
         );
         userOperation = paymasterUserOperation as UserOperationV8; // Update userOperation with paymaster data
         console.debug({ userOp: userOperation, sponsorMeta: sponsorMetadata }, "UserOperation after paymaster sponsorship");
@@ -463,7 +478,7 @@ function App() {
 
         // Send UserOperation (using abstractionkit) (MD step 4.2.10)
         console.debug("Sending UserOperation to bundler...");
-        const sendUserOpResponse = await smartAccount.sendUserOperation(userOperation, CANDIDE_SEPOLIA_BUNDLER_URL);
+        const sendUserOpResponse = await smartAccount.sendUserOperation(userOperation, ACTUAL_BUNDLER_URL); // Use configured Bundler URL
         console.info(`UserOperation sent. UserOpHash from sendUserOpResponse: ${sendUserOpResponse.userOperationHash}`);
         result = sendUserOpResponse.userOperationHash; // Store UserOpHash as the initial result
 
@@ -575,20 +590,37 @@ function App() {
       <DashboardHeader />
 
       <main className="w-full max-w-4xl mt-8 p-4 bg-gray-800 rounded shadow-lg">
-        <h2 className="text-xl mb-4">Dashboard Status</h2>
         <h2 className="text-xl mb-4">Settings</h2>
-        <div className="flex items-center space-x-2 mb-6 p-3 bg-gray-700 rounded-md">
-            <Switch
-                id="eip7702-toggle"
-                checked={isEip7702Enabled}
-                onCheckedChange={setIsEip7702Enabled}
-                disabled={!isConnected || chainId !== 11155111} // Example: Enable only for Sepolia and when connected
-            />
-            <Label htmlFor="eip7702-toggle" className="text-sm font-medium">
-                Enable EIP-7702 Gasless Transactions (Sepolia Only)
-            </Label>
+        <div className="p-3 bg-gray-700 rounded-md mb-6">
+            <div className="flex items-center space-x-2">
+                <Switch
+                    id="eip7702-toggle"
+                    checked={isEip7702Enabled}
+                    onCheckedChange={(checked) => {
+                        if (checked && !areCandideUrlsConfigured) {
+                            const configErrorMessage = "Cannot enable: EIP-7702 Bundler/Paymaster URLs not configured in .env. Set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
+                            console.error(configErrorMessage);
+                            setEip7702ConfigError(configErrorMessage);
+                            setIsEip7702Enabled(false);
+                        } else {
+                            setIsEip7702Enabled(checked);
+                            setEip7702ConfigError(null); // Clear error if successfully enabled/disabled
+                        }
+                    }}
+                    disabled={!isConnected || chainId !== 11155111}
+                />
+                <Label htmlFor="eip7702-toggle" className="text-sm font-medium">
+                    Enable EIP-7702 Gasless Transactions (Sepolia Only)
+                </Label>
+            </div>
             {(!isConnected || chainId !== 11155111) && isEip7702Enabled && (
-                 <p className="text-xs text-yellow-400 ml-2">Connect to Sepolia to use EIP-7702 mode.</p>
+                 <p className="text-xs text-yellow-400 mt-2">Connect to Sepolia to use EIP-7702 mode.</p>
+            )}
+            {eip7702ConfigError && (
+                <p className="text-xs text-red-400 mt-2">{eip7702ConfigError}</p>
+            )}
+            {!areCandideUrlsConfigured && (
+                 <p className="text-xs text-orange-400 mt-2">Note: EIP-7702 Bundler/Paymaster URLs are not configured. Please set them in your <code>client/.env</code> file (e.g., VITE_CANDIDE_SEPOLIA_BUNDLER_URL).</p>
             )}
         </div>
 

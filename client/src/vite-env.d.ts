@@ -10,3 +10,15 @@ interface Window {
         // Add other properties/methods if you use them
     }
 }
+
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_CANDIDE_SEPOLIA_BUNDLER_URL?: string;
+  readonly VITE_CANDIDE_SEPOLIA_PAYMASTER_URL?: string;
+  // Add other environment variables here as needed
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
