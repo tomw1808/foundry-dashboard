@@ -15,8 +15,12 @@ import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
 import { Switch } from '@/components/ui/switch'; // Assuming you have a Switch component (e.g., from shadcn)
 import { Label } from '@/components/ui/label';   // Assuming you have a Label component
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // For new UI
+import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'; // For EIP-7702 session key
+import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
 
 // --- Configuration Constants for Candide EIP-7702 ---
+// Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
 const CANDIDE_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com"; // Public RPC, can remain hardcoded or also be env var
 
 // Bundler and Paymaster URLs from Vite environment variables (see .env.example)
