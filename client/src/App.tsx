@@ -9,8 +9,6 @@ import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, 
 import { parseSignature } from 'viem'; // EIP-7702
 // Helper from abstractionkit or replicate its bigintToHex logic if needed for eip7702Auth object
 const bigintToHexAK = (val: bigint): Hex => ('0x' + (val === 0n ? '0' : val.toString(16))) as Hex; // EIP-7702
-import { DashboardHeader } from '@/components/DashboardHeader';
-import { DashboardHeader } from '@/components/DashboardHeader';
 import { DashboardStatus } from '@/components/DashboardStatus';
 import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
@@ -493,7 +491,7 @@ function App() {
             account: eip7702SessionAccount, // Sign with the session account
             contractAddress: designatedContractAddress,
             nonce: sessionAccountNonceForAuth,
-            chainId: BigInt(chainId),
+            chainId: chainId,
             // authority & executor: Using viem defaults.
         });
 
