@@ -10,14 +10,16 @@ import { parseSignature } from 'viem'; // EIP-7702
 // Helper from abstractionkit or replicate its bigintToHex logic if needed for eip7702Auth object
 const bigintToHexAK = (val: bigint): Hex => ('0x' + (val === 0n ? '0' : val.toString(16))) as Hex; // EIP-7702
 import { DashboardHeader } from '@/components/DashboardHeader';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { DashboardStatus } from '@/components/DashboardStatus';
 import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
-import { Switch } from '@/components/ui/switch'; // Assuming you have a Switch component (e.g., from shadcn)
-import { Label } from '@/components/ui/label';   // Assuming you have a Label component
+// import { Switch } from '@/components/ui/switch'; // No longer needed
+// import { Label } from '@/components/ui/label';   // No longer needed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // For new UI
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
+import { createWalletClient, http } from 'viem'; // Added for local EIP-7702 client
 
 // --- Configuration Constants for Candide EIP-7702 ---
 // Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
@@ -58,7 +60,7 @@ function App() {
   const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>('browser'); // New mode state
   const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
   const [eip7702SessionAccount, setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
-  // Keep config error state for now, might be repurposed or removed later
+  // Config error state for EIP-7702 URLs (can still be useful)
   const [eip7702ConfigError, setEip7702ConfigError] = useState<string | null>(null);
 
   // --- WebSocket Connection ---
@@ -381,40 +383,76 @@ function App() {
     const { requestId, payload } = request;
     const currentWs = wsRef.current;
 
-    console.log(`Attempting to sign request ${requestId} for method ${payload.method}, EIP7702: ${isEip7702Enabled}`);
+    console.log(`Attempting to sign request ${requestId} for method ${payload.method}, Mode: ${activeMode}`);
 
-    if (!walletClient || !currentWs || currentWs.readyState !== WebSocket.OPEN || !address || !chainId || !publicClient) {
-      const reason = !walletClient ? 'Wallet client not available'
-                   : !currentWs || currentWs.readyState !== WebSocket.OPEN ? 'WebSocket not open'
-                   : !address ? 'EOA address not available'
-                   : !chainId ? 'Chain ID not available'
-                   : 'Public client not available';
-      console.error(`${reason}, cannot sign transaction for ${requestId}`);
-      // Send error response only if WS is available
-      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-         sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
-      }
-      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-      return;
+    // Basic checks needed regardless of mode
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN || !chainId || !publicClient) {
+        const reason = !currentWs || currentWs.readyState !== WebSocket.OPEN ? 'WebSocket not open'
+                     : !chainId ? 'Chain ID not available'
+                     : 'Public client not available';
+        console.error(`${reason}, cannot sign transaction for ${requestId}`);
+        if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+        }
+        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        return;
     }
 
-    // Check for EIP-7702 configuration if mode is enabled
-    if (isEip7702Enabled && chainId === 11155111 && !areCandideUrlsConfigured) {
-        const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
-        console.error(`[${requestId}] ${configErrorMessage}`);
-        setEip7702ConfigError(configErrorMessage); // Show error to user
-        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
-        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-        setIsEip7702Enabled(false); // Disable toggle as it's misconfigured
-      return;
+    // Mode-specific checks
+    if (activeMode === 'browser') {
+        // Browser mode requires connected browser wallet
+        if (!walletClient || !address) {
+            const reason = !walletClient ? 'Browser wallet client not available' : 'Browser wallet address not available';
+            console.error(`${reason}, cannot sign transaction in Browser Wallet mode for ${requestId}`);
+            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+            return;
+        }
+    } else if (activeMode === 'eip7702') {
+        // EIP-7702 mode requires a session account and configured URLs (for Sepolia)
+        if (!eip7702SessionAccount) {
+            const reason = 'EIP-7702 session account not available. Generate or set a private key.';
+            console.error(`${reason}, cannot sign transaction in EIP-7702 mode for ${requestId}`);
+            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+            return;
+        }
+        if (chainId === 11155111 && !areCandideUrlsConfigured) {
+            const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
+            console.error(`[${requestId}] ${configErrorMessage}`);
+            setEip7702ConfigError(configErrorMessage); // Show error in UI
+            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
+            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+            // Do not disable the mode here, just prevent the transaction
+            return;
+        }
+    }
+
+    // Determine RPC URL for local client creation if needed
+    let rpcUrlForSessionClient = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback
+    if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
+        const clientRpcUrl = publicClient.transport.config.url;
+        if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+            rpcUrlForSessionClient = clientRpcUrl;
+        }
     }
 
     try {
       let result: any;
 
-      if (isEip7702Enabled && chainId === 11155111 && address) { // Only for Sepolia for now & ensure address is available
-        // --- EIP-7702 Flow ---
-        console.log(`[${requestId}] Starting EIP-7702 flow...`);
+      if (activeMode === 'eip7702' && chainId === 11155111 && eip7702SessionAccount) { // Check mode and session account
+        // --- EIP-7702 Flow (using Session Private Key) ---
+        console.log(`[${requestId}] Starting EIP-7702 flow using session account ${eip7702SessionAccount.address}...`);
+
+        // Create a local WalletClient for the session account
+        const localWalletClient = createWalletClient({
+            account: eip7702SessionAccount,
+            chain: publicClient.chain, // Use the chain object from the public client
+            transport: http(rpcUrlForSessionClient)
+        });
+        console.debug(`[${requestId}] Created local WalletClient for session account.`);
+
+
         if (payload.method !== 'eth_sendTransaction' || !payload.params?.[0]) {
             sendSignResponse(currentWs, requestId, { error: { code: -32602, message: "EIP-7702 flow currently only supports eth_sendTransaction." } });
             setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
@@ -431,8 +469,9 @@ function App() {
         }
 
         // --- EIP-7702 Specific Logic Starts Here ---
+        // Instantiate Simple7702Account using the SESSION account address
         const smartAccount = new Simple7702Account(
-            address, // EOA address
+            eip7702SessionAccount.address, // Use session account address
             { entrypointAddress: CANDIDE_ENTRY_POINT_ADDRESS }
         );
 
@@ -444,15 +483,16 @@ function App() {
         };
         console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702");
 
-        // Prepare & Sign EIP-7702 Authorization (MD step 4.2.6)
-        const eoaNonceForAuth = await publicClient.getTransactionCount({ address, blockTag: 'pending' });
+        // Prepare & Sign EIP-7702 Authorization using the LOCAL wallet client
+        // Nonce is for the SESSION account
+        const sessionAccountNonceForAuth = await publicClient.getTransactionCount({ address: eip7702SessionAccount.address, blockTag: 'pending' });
         const designatedContractAddress = SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS;
 
-        console.debug(`Signing EIP-7702 Auth: EOA=${address}, DesignatedContract=${designatedContractAddress}, EOAAuthNonce=${eoaNonceForAuth}`);
-        const eip7702FullSignature = await walletClient.signAuthorization({
-            account: address,
+        console.debug(`Signing EIP-7702 Auth: SessionAccount=${eip7702SessionAccount.address}, DesignatedContract=${designatedContractAddress}, SessionAccountAuthNonce=${sessionAccountNonceForAuth}`);
+        const eip7702FullSignature = await localWalletClient.signAuthorization({
+            account: eip7702SessionAccount, // Sign with the session account
             contractAddress: designatedContractAddress,
-            nonce: eoaNonceForAuth,
+            nonce: sessionAccountNonceForAuth,
             chainId: BigInt(chainId),
             // authority & executor: Using viem defaults.
         });
@@ -461,29 +501,16 @@ function App() {
 
         const eip7702AuthForUserOpOverride = { // Structure for abstractionkit's eip7702Auth override
             chainId: BigInt(chainId), // Expected as bigint
-            address: address,
-            nonce: eoaNonceForAuth,   // Expected as bigint
-            yParity: BigInt(yParity) === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Corrected to use 0n for bigint comparison
+            address: eip7702SessionAccount.address, // Use session account address
+            nonce: sessionAccountNonceForAuth,      // Use session account nonce
+            yParity: BigInt(yParity) === 0n ? '0x00' : '0x01' as '0x00' | '0x01',
             r: r as Hex,
             s: s as Hex,
         };
-        console.debug({ authData: eip7702AuthForUserOpOverride }, "Prepared EIP-7702 Auth data for UserOp override");
+        console.debug({ authData: eip7702AuthForUserOpOverride }, "Prepared EIP-7702 Auth data for UserOp override using session account");
 
-        // Determine RPC URL for UserOperation creation (MD step 4.2.7 preparation)
-        // For now, this logic is Sepolia-specific due to CANDIDE_SEPOLIA_BUNDLER_URL and Paymaster later.
-        let rpcUrlForUserOp = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback for Sepolia
-        if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
-            const clientRpcUrl = publicClient.transport.config.url;
-            // Ensure the client's RPC URL is HTTP/S for abstractionkit compatibility
-            if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
-                rpcUrlForUserOp = clientRpcUrl;
-                console.debug(`Using RPC URL from publicClient for UserOperation: ${rpcUrlForUserOp}`);
-            } else {
-                console.debug(`publicClient RPC URL (${clientRpcUrl}) is not HTTP/S. Falling back to CANDIDE_SEPOLIA_RPC_URL for UserOperation.`);
-            }
-        } else {
-            console.debug("publicClient RPC URL not available or not a string. Falling back to CANDIDE_SEPOLIA_RPC_URL for UserOperation.");
-        }
+        // RPC URL for UserOperation creation (already determined as rpcUrlForSessionClient)
+        const rpcUrlForUserOp = rpcUrlForSessionClient;
 
         // Create UserOperation (using abstractionkit) (MD step 4.2.7)
         console.debug(`Creating UserOperation with abstractionkit using RPC: ${rpcUrlForUserOp}, Bundler: ${ACTUAL_BUNDLER_URL}`);
@@ -514,10 +541,10 @@ function App() {
         );
         console.debug(`UserOperation hash to sign: ${userOpHash}`);
 
-        console.debug("Signing UserOperation hash with walletClient...");
-        const userOpSignature = await walletClient.signMessage({
-            account: address,
-            message: { raw: userOpHash as Hex }, // message can be string or { raw: Hex }
+        console.debug("Signing UserOperation hash with LOCAL session walletClient...");
+        const userOpSignature = await localWalletClient.signMessage({
+            account: eip7702SessionAccount, // Sign with the session account
+            message: { raw: userOpHash as Hex },
         });
         userOperation.signature = userOpSignature;
         console.debug(`UserOperation signature obtained: ${userOpSignature}`);
@@ -558,13 +585,14 @@ function App() {
       }
 
       const txHashOrUserOpHash = result as Hex; // This is UserOpHash for EIP-7702, TxHash for standard
-      const currentChainId = chainId;
+      const currentChainId = chainId; // Already checked for existence
       const decodedInfo = request.payload.decoded;
 
       if (txHashOrUserOpHash && currentChainId) {
-          const txLabel = isEip7702Enabled && chainId === 11155111
-              ? `EIP-7702: ${generateTxLabel(decodedInfo)} (UserOp)`
-              : generateTxLabel(decodedInfo);
+          // Determine label based on active mode
+          const txLabel = activeMode === 'eip7702' && chainId === 11155111
+              ? `EIP-7702 Session: ${generateTxLabel(decodedInfo)} (UserOp)`
+              : `Browser Wallet: ${generateTxLabel(decodedInfo)}`; // Default/Browser mode label
 
           const newTrackedTx: TrackedTxInfo = {
               hash: txHashOrUserOpHash, // Store UserOpHash for EIP-7702, TxHash for standard
