@@ -497,8 +497,16 @@ function App() {
 
         // Extract r, s, v directly from the result. No need for parseSignature.
         const { r, s, v } = eip7702FullSignature;
-        // Calculate yParity from v (assuming v is 27 or 28)
+
+        // Validate v and calculate yParity
+        if (typeof v !== 'bigint') {
+            throw new Error(`Invalid 'v' value received from signAuthorization: ${v}`);
+        }
         const yParity = v - 27n; // 0n if v is 27, 1n if v is 28
+        if (yParity !== 0n && yParity !== 1n) {
+             throw new Error(`Calculated invalid yParity (${yParity}) from v (${v})`);
+        }
+
 
         const eip7702AuthForUserOpOverride = { // Structure for abstractionkit's eip7702Auth override
             chainId: BigInt(chainId), // Expected as bigint
