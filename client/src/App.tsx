@@ -51,8 +51,11 @@ function App() {
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
   const [processedRequests, setProcessedRequests] = useState(0);
   const [trackedTxs, setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
-  const [isEip7702Enabled, setIsEip7702Enabled] = useState(false); // State for EIP-7702 toggle
-  const [eip7702ConfigError, setEip7702ConfigError] = useState<string | null>(null); // Error message for EIP-7702 config
+  const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>('browser'); // New mode state
+  const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
+  const [eip7702SessionAccount, setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
+  // Keep config error state for now, might be repurposed or removed later
+  const [eip7702ConfigError, setEip7702ConfigError] = useState<string | null>(null);
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -113,6 +116,33 @@ function App() {
       socket.close();
     };
   }, []); // Run only once on component mount
+
+  // --- Generate EIP-7702 Session Key Effect ---
+  useEffect(() => {
+    // Generate key only if switching to EIP-7702 mode and no key exists yet
+    if (activeMode === 'eip7702' && !eip7702PrivateKey) {
+      console.log("Generating initial EIP-7702 session private key...");
+      const newPrivateKey = generatePrivateKey();
+      setEip7702PrivateKey(newPrivateKey);
+    }
+  }, [activeMode, eip7702PrivateKey]); // Run when mode changes or key is cleared
+
+  // --- Derive EIP-7702 Session Account Effect ---
+  useEffect(() => {
+    if (eip7702PrivateKey) {
+      try {
+        const account = privateKeyToAccount(eip7702PrivateKey);
+        setEip7702SessionAccount(account);
+        console.log("Derived EIP-7702 session account:", account.address);
+      } catch (error) {
+        console.error("Failed to derive account from private key:", error);
+        setEip7702SessionAccount(null);
+        // Optionally provide user feedback about invalid key in the Eip7702ModeDisplay component
+      }
+    } else {
+      setEip7702SessionAccount(null);
+    }
+  }, [eip7702PrivateKey]); // Run when private key changes
 
 
   // --- Transaction Receipt Polling Effect ---
@@ -597,46 +627,63 @@ function App() {
   };
 
 
+  // Determine RPC URL for potential local client use
+  let rpcUrlForLocalClient = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback for Sepolia
+  if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
+      const clientRpcUrl = publicClient.transport.config.url;
+      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+          rpcUrlForLocalClient = clientRpcUrl;
+      }
+  }
+
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
-      <DashboardHeader />
+      {/* Replace Header with Tabs */}
+      <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700">
+          <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
+          {/* ConnectButton can stay if desired, or be moved */}
+      </header>
 
       <main className="w-full max-w-4xl mt-8 p-4 bg-gray-800 rounded shadow-lg">
-        <h2 className="text-xl mb-4">Settings</h2>
-        <div className="p-3 bg-gray-700 rounded-md mb-6">
-            <div className="flex items-center space-x-2">
-                <Switch
-                    id="eip7702-toggle"
-                    checked={isEip7702Enabled}
-                    onCheckedChange={(checked) => {
-                        if (checked && !areCandideUrlsConfigured) {
-                            const configErrorMessage = "Cannot enable: EIP-7702 Bundler/Paymaster URLs not configured in .env. Set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
-                            console.error(configErrorMessage);
-                            setEip7702ConfigError(configErrorMessage);
-                            setIsEip7702Enabled(false);
-                        } else {
-                            setIsEip7702Enabled(checked);
-                            setEip7702ConfigError(null); // Clear error if successfully enabled/disabled
-                        }
-                    }}
-                    disabled={!isConnected || chainId !== 11155111}
-                />
-                <Label htmlFor="eip7702-toggle" className="text-sm font-medium">
-                    Enable EIP-7702 Gasless Transactions (Sepolia Only)
-                </Label>
-            </div>
-            {(!isConnected || chainId !== 11155111) && isEip7702Enabled && (
-                 <p className="text-xs text-yellow-400 mt-2">Connect to Sepolia to use EIP-7702 mode.</p>
-            )}
-            {eip7702ConfigError && (
-                <p className="text-xs text-red-400 mt-2">{eip7702ConfigError}</p>
-            )}
-            {!areCandideUrlsConfigured && (
-                 <p className="text-xs text-orange-400 mt-2">Note: EIP-7702 Bundler/Paymaster URLs are not configured. Please set them in your <code>client/.env</code> file (e.g., VITE_CANDIDE_SEPOLIA_BUNDLER_URL).</p>
-            )}
-        </div>
 
-        <h2 className="text-xl mb-4">Dashboard Status</h2>
+        <Tabs value={activeMode} onValueChange={(value) => setActiveMode(value as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="browser">Browser Wallet</TabsTrigger>
+                <TabsTrigger value="eip7702" disabled={!isConnected || chainId !== 11155111}>
+                    EIP-7702 Session
+                    {(!isConnected || chainId !== 11155111) && <span className="text-xs text-yellow-500 ml-1">(Sepolia Only)</span>}
+                </TabsTrigger>
+                <TabsTrigger value="erc4337" disabled>ERC-4337 (Soon)</TabsTrigger>
+            </TabsList>
+
+            {/* Content for Browser Wallet Mode (Default) */}
+            <TabsContent value="browser">
+                 <p className="text-sm text-gray-400 mb-4">Standard mode: Transactions are signed and sent directly by your connected browser wallet.</p>
+                 {/* Status, Pending Actions, Tracked Txs will be shown below the tabs */}
+            </TabsContent>
+
+            {/* Content for EIP-7702 Mode */}
+            <TabsContent value="eip7702">
+                 <Eip7702ModeDisplay
+                    privateKey={eip7702PrivateKey}
+                    sessionAccount={eip7702SessionAccount}
+                    setPrivateKey={setEip7702PrivateKey}
+                    rpcUrl={rpcUrlForLocalClient}
+                    chainId={chainId}
+                 />
+                 {/* Status, Pending Actions, Tracked Txs will be shown below the tabs */}
+            </TabsContent>
+
+             {/* Content for ERC-4337 Mode */}
+            <TabsContent value="erc4337">
+                <p className="text-center text-gray-500 italic mt-8">Full ERC-4337 Smart Account support coming soon...</p>
+            </TabsContent>
+
+        </Tabs>
+
+        {/* Common Sections - Shown regardless of tab */}
+        <h2 className="text-xl mb-4 mt-8 border-t border-gray-700 pt-6">Dashboard Status</h2>
         <DashboardStatus
             wsStatus={wsStatus}
             isConnected={isConnected}
