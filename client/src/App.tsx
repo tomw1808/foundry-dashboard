@@ -13,6 +13,11 @@ import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
 // import { Switch } from '@/components/ui/switch'; // No longer needed
 // import { Label } from '@/components/ui/label';   // No longer needed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // For new UI
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // For helper text
+import { Button } from '@/components/ui/button'; // For copy button
+import { Copy, Terminal } from 'lucide-react'; // For icons
+import { ConnectButton } from '@rainbow-me/rainbowkit'; // Assuming RainbowKit ConnectButton
+
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
 import { createWalletClient, http } from 'viem'; // Added for local EIP-7702 client
@@ -721,13 +726,26 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
       {/* Replace Header with Tabs */}
-      <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700">
+      <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700 mb-6">
           <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
-          {/* ConnectButton can stay if desired, or be moved */}
+          {/* ConnectButton will be moved into the Browser Wallet tab */}
       </header>
 
-      <main className="w-full max-w-4xl mt-8 p-4 bg-gray-800 rounded shadow-lg">
+      {/* Dashboard Status moved above tabs */}
+      <div className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mb-6">
+        <h2 className="text-xl mb-4">Dashboard Status</h2>
+        <DashboardStatus
+            wsStatus={wsStatus}
+            isConnected={isConnected}
+            address={address} // Pass browser wallet address here
+            chainId={chainId}
+            processedRequests={processedRequests}
+            copyToClipboard={copyToClipboard}
+        />
+      </div>
 
+
+      <main className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg">
         <Tabs value={activeMode} onValueChange={(value) => setActiveMode(value as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="browser">Browser Wallet</TabsTrigger>
@@ -740,8 +758,22 @@ function App() {
 
             {/* Content for Browser Wallet Mode (Default) */}
             <TabsContent value="browser">
-                 <p className="text-sm text-gray-400 mb-4">Standard mode: Transactions are signed and sent directly by your connected browser wallet.</p>
-                 {/* Status, Pending Actions, Tracked Txs will be shown below the tabs */}
+                <div className="space-y-4">
+                    <p className="text-sm text-gray-400">
+                        Standard mode: Transactions are signed and sent directly by your connected browser wallet.
+                    </p>
+                    <div className="flex items-center space-x-4 p-3 bg-gray-700/50 rounded-md">
+                        <ConnectButton />
+                        {isConnected && address && (
+                            <div className="flex items-center space-x-2">
+                                <span className="font-mono text-sm text-gray-300 truncate" title={address}>{address}</span>
+                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(address)} title="Copy Address">
+                                    <Copy size={16} />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </TabsContent>
 
             {/* Content for EIP-7702 Mode */}
@@ -750,10 +782,30 @@ function App() {
                     privateKey={eip7702PrivateKey}
                     sessionAccount={eip7702SessionAccount}
                     setPrivateKey={setEip7702PrivateKey}
-                    rpcUrl={rpcUrlForLocalClient}
-                    chainId={chainId}
+                    rpcUrl={rpcUrlForLocalClient} // This prop might not be actively used by Eip7702ModeDisplay currently
+                    chainId={chainId} // This prop might not be actively used by Eip7702ModeDisplay currently
                  />
-                 {/* Status, Pending Actions, Tracked Txs will be shown below the tabs */}
+                 <Alert className="mt-6 border-blue-500 bg-blue-900/30 text-blue-200">
+                    <Terminal className="h-4 w-4 !text-blue-400" />
+                    <AlertTitle className="text-blue-300">Tip: Deterministic Deployments with Factories</AlertTitle>
+                    <AlertDescription className="text-sm text-blue-300/90 space-y-2">
+                        <p>
+                            For EIP-7702 (and ERC-4337) smart accounts, contract deployments must go through the account's `execute` function.
+                            Direct `new MyContract()` in Foundry scripts won't work as expected with these account types.
+                        </p>
+                        <p>
+                            Instead, use a factory contract like <a href="https://crearex.xyz/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-100">CreateX</a> (or a similar CREATE/CREATE2 factory) to deploy your contracts.
+                            This gives you a deterministic address.
+                        </p>
+                        <p>
+                            Your Foundry script would then call the factory's deployment function (e.g., `createx.create(bytecode)` or `createx.create2(salt, bytecode)`),
+                            and this call becomes the `MetaTransaction` for your EIP-7702 UserOperation.
+                        </p>
+                        <p>
+                            Example: `vm.tx(factory.create(type(MyContract).creationCode));`
+                        </p>
+                    </AlertDescription>
+                </Alert>
             </TabsContent>
 
              {/* Content for ERC-4337 Mode */}
@@ -763,17 +815,8 @@ function App() {
 
         </Tabs>
 
-        {/* Common Sections - Shown regardless of tab */}
-        <h2 className="text-xl mb-4 mt-8 border-t border-gray-700 pt-6">Dashboard Status</h2>
-        <DashboardStatus
-            wsStatus={wsStatus}
-            isConnected={isConnected}
-            address={address}
-            chainId={chainId}
-            processedRequests={processedRequests}
-            copyToClipboard={copyToClipboard}
-        />
-
+        {/* Common Sections - Shown regardless of tab, below the specific tab content */}
+        {/* PendingActionsList and TrackedTransactionsList are now general */}
         <PendingActionsList
             pendingSignRequests={pendingSignRequests}
             handleSignTransaction={handleSignTransaction}
