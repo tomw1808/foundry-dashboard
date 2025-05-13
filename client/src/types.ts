@@ -45,7 +45,7 @@ export interface TrackedTxInfo {
     chainId: number;
     label: string;
     actualTxHash?: Hex; // For UserOps, the final transaction hash
-    // userOpHash?: Hex; // We'll use 'hash' to store UserOpHash initially for EIP-7702
+    isEip7702Deployment?: boolean; // Flag for EIP-7702 contract deployments
 }
 
 // Type for WebSocket status display

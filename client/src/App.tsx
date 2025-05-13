@@ -20,7 +20,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'; // Assuming RainbowKit C
 
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
-import { createWalletClient, http, encodeFunctionData } from 'viem'; // Added encodeFunctionData & for local EIP-7702 client
+import { createWalletClient, http, encodeFunctionData, decodeEventLog } from 'viem'; // Added decodeEventLog, encodeFunctionData & for local EIP-7702 client
 
 // --- Configuration Constants for Candide EIP-7702 ---
 // Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
@@ -45,7 +45,7 @@ const areCandideUrlsConfigured =
 // Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
 const CANDIDE_ENTRY_POINT_ADDRESS = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108";
 // Default delegatee for Simple7702Account - Updated to custom contract address
-const SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS = "0xE2729634fc02E8c757fbb27F0d01228cd24022D2" as Address;
+const SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS = "0xf331ea1d57d32f82d70BCE5EcDa04F819E84CABd" as Address;
 
 
 function App() {
@@ -292,7 +292,8 @@ function App() {
         case 'eth_requestAccounts': // Often used by dapps, similar to eth_accounts
           result = [address];
           break;
-        case 'eth_getTransactionCount':
+        case 'eth_getTransactionCount': {
+          // Keep existing eth_getTransactionCount logic here
           try {
             // Extract address and block tag from params (handle potential undefined)
             const targetAddress = payload.params?.[0] as Address | undefined;
@@ -325,6 +326,85 @@ function App() {
             error = { code: err.code || -32603, message: `Failed to get transaction count: ${err.message || 'Unknown error'}` };
           }
           break;
+        }
+        case 'eth_getTransactionReceipt': {
+          const requestedTxHash = payload.params?.[0] as Hex | undefined;
+          if (!requestedTxHash) {
+            error = { code: -32602, message: 'Invalid params: Missing transaction hash for eth_getTransactionReceipt' };
+            break;
+          }
+
+          let eip7702DeploymentInfo: TrackedTxInfo | undefined;
+          // Iterate over trackedTxs to find if this txHash corresponds to an EIP-7702 deployment
+          for (const txInfo of trackedTxs.values()) {
+            if (txInfo.actualTxHash === requestedTxHash && txInfo.isEip7702Deployment) {
+              eip7702DeploymentInfo = txInfo;
+              break;
+            }
+          }
+
+          if (eip7702DeploymentInfo) {
+            console.log(`[${requestId}] Intercepting eth_getTransactionReceipt for EIP-7702 deployment: ${requestedTxHash}`);
+            try {
+              const originalReceipt = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
+              if (originalReceipt) {
+                // Define the ABI for your ContractDeployed event from your custom Simple7702Account
+                const contractDeployedEventAbi = [{
+                  type: 'event',
+                  name: 'ContractDeployed', // Ensure this matches your event name
+                  inputs: [
+                    { name: 'newContractAddress', type: 'address', indexed: false }, // Assuming not indexed
+                  ],
+                  anonymous: false,
+                }] as const;
+
+                let deployedContractAddress: Address | null = null;
+                for (const log of originalReceipt.logs) {
+                  // Check if the log is from your custom Simple7702Account contract
+                  if (log.address.toLowerCase() === SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS.toLowerCase()) {
+                    try {
+                      const decodedLog = decodeEventLog({
+                        abi: contractDeployedEventAbi,
+                        data: log.data,
+                        topics: log.topics,
+                        strict: false, // Be less strict if topics might not perfectly match
+                      });
+                      if (decodedLog.eventName === 'ContractDeployed') {
+                        // Access args based on your event definition
+                        deployedContractAddress = (decodedLog.args as { newContractAddress: Address }).newContractAddress;
+                        console.log(`[${requestId}] Found deployed contract address from event: ${deployedContractAddress}`);
+                        break; // Found the address
+                      }
+                    } catch (decodeError) {
+                      // console.warn(`[${requestId}] Failed to decode log for potential ContractDeployed event:`, decodeError, log);
+                    }
+                  }
+                }
+
+                result = {
+                  ...originalReceipt,
+                  contractAddress: deployedContractAddress || originalReceipt.contractAddress || null, // Override or set contractAddress
+                };
+                console.log(`[${requestId}] Modified receipt for EIP-7702 deployment:`, result);
+              } else {
+                result = null; // No receipt found
+              }
+            } catch (err: any) {
+              console.error(`[${requestId}] Error fetching/modifying receipt for EIP-7702 deployment:`, err);
+              error = { code: -32603, message: `Failed to get/modify receipt for EIP-7702 deployment: ${err.message || 'Unknown error'}` };
+            }
+          } else {
+            // Standard handling if not an EIP-7702 deployment or no special handling needed
+            try {
+              console.log(`[${requestId}] Standard eth_getTransactionReceipt for: ${requestedTxHash}`);
+              result = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
+            } catch (err: any) {
+              console.error(`[${requestId}] Error calling publicClient.getTransactionReceipt:`, err);
+              error = { code: -32603, message: `Failed to get transaction receipt: ${err.message || 'Unknown error'}` };
+            }
+          }
+          break;
+        }
         // Add cases for other common read-only methods if needed (eth_call, eth_estimateGas etc.)
         // case 'eth_call':
         //   result = await publicClient.call({ /* construct params */ });
@@ -638,7 +718,8 @@ function App() {
                     status: receiptResult.success ? 'success' : 'reverted',
                     blockNumber: receiptResult.receipt?.blockNumber,
                     actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
-                    // contractAddress might need parsing from logs if it's a deployment via UserOp
+                    // Set isEip7702Deployment flag if it was a contract creation
+                    isEip7702Deployment: !sanitizedTx.to ? true : existingTx.isEip7702Deployment,
                 };
                 return new Map(prevMap).set(userOpHashForTracking, updatedTxInfo);
             }
