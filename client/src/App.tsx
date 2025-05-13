@@ -672,7 +672,6 @@ function App() {
         }
       }
 
-      const txHashOrUserOpHash = result as Hex; // This is UserOpHash for EIP-7702, TxHash for standard
       const txHashFromFlow = result as Hex; // This is actualTxHash for EIP-7702, TxHash for standard
       const currentChainIdForTracking = chainId; // Already checked for existence
       const decodedInfoForTracking = request.payload.decoded;
