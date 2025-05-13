@@ -385,7 +385,7 @@ function App() {
                   ...originalReceipt,
                   contractAddress: deployedContractAddress || originalReceipt.contractAddress || null, // Override or set contractAddress
                 };
-                console.log(`[${requestId}] Modified receipt for EIP-7702 deployment:`, result);
+                console.log(`[${requestId}] Modified receipt for EIP-7702 deployment:`, JSON.stringify(result, jsonReplacer, 2));
               } else {
                 result = null; // No receipt found
               }
@@ -398,10 +398,35 @@ function App() {
             try {
               console.log(`[${requestId}] Standard eth_getTransactionReceipt for: ${requestedTxHash}`);
               result = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
+              // console.log(`[${requestId}] Standard receipt fetched:`, JSON.stringify(result, jsonReplacer, 2));
             } catch (err: any) {
               console.error(`[${requestId}] Error calling publicClient.getTransactionReceipt:`, err);
               error = { code: -32603, message: `Failed to get transaction receipt: ${err.message || 'Unknown error'}` };
             }
+          }
+          // Normalize receipt fields before sending back to Foundry
+          if (result) { // Ensure result is not null
+            // Fix 1: Normalize 'type' field
+            if (typeof result.type === 'string' && result.type.toLowerCase() === 'eip7702') {
+              console.warn(`[${requestId}] Normalizing receipt type from "${result.type}" to "0x4" (EIP-7702 standard type).`);
+              result.type = '0x4'; // EIP-2718 type for EIP-7702
+            } else if (result.type === null || result.type === undefined) {
+              // If type is missing from the receipt, default to '0x2' (EIP-1559) as a common modern type.
+              // Foundry expects a type.
+              console.warn(`[${requestId}] Receipt type is ${result.type}. Defaulting to "0x2".`);
+              result.type = '0x2';
+            }
+
+            // Fix 2: Normalize 'status' field from 'success'/'reverted' string to '0x1'/'0x0' hex
+            // Viem's getTransactionReceipt returns status as 'success' | 'reverted'. Foundry expects hex.
+            if (result.status === 'success') {
+              result.status = '0x1';
+            } else if (result.status === 'reverted') {
+              result.status = '0x0';
+            }
+            // If status is already '0x0', '0x1', or if it's null/undefined from the node,
+            // this won't change it. If null/undefined, Foundry might still have issues,
+            // but that's a data problem from the node. We ensure it's hex if it was 'success'/'reverted'.
           }
           break;
         }
