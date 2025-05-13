@@ -511,7 +511,7 @@ function App() {
         const eip7702AuthForUserOpOverride = { // Structure for abstractionkit's eip7702Auth override
             chainId: BigInt(chainId), // Expected as bigint
             address: eip7702SessionAccount.address, // Use session account address
-            nonce: sessionAccountNonceForAuth,      // Use session account nonce
+            nonce: BigInt(sessionAccountNonceForAuth),      // Use session account nonce
             yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Convert 0n/1n to '0x00'/'0x01'
             r: r, // Already Hex
             s: s, // Already Hex
@@ -527,9 +527,12 @@ function App() {
             [metaTx],
             rpcUrlForUserOp,
             ACTUAL_BUNDLER_URL, // Use configured Bundler URL
-            { eip7702Auth: eip7702AuthForUserOpOverride }
+            { eip7702Auth: {
+              chainId: BigInt(chainId)
+            } }
         ) as UserOperationV8;
         console.debug({ userOp: userOperation }, "UserOperation created by abstractionkit");
+        // userOperation.eip7702Auth = eip7702AuthForUserOpOverride;
 
         // Paymaster Sponsorship (using abstractionkit) (MD step 4.2.8)
         console.debug("Applying paymaster sponsorship with CandidePaymaster...");
