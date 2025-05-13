@@ -61,8 +61,6 @@ function App() {
   const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>('browser'); // New mode state
   const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
   const [eip7702SessionAccount, setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
-  // Config error state for EIP-7702 URLs (can still be useful)
-  const [eip7702ConfigError, setEip7702ConfigError] = useState<string | null>(null);
 
   // --- WebSocket Connection ---
   useEffect(() => {
