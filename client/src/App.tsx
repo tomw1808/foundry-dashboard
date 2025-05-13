@@ -20,7 +20,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'; // Assuming RainbowKit C
 
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
-import { createWalletClient, http } from 'viem'; // Added for local EIP-7702 client
+import { createWalletClient, http, encodeFunctionData } from 'viem'; // Added encodeFunctionData & for local EIP-7702 client
 
 // --- Configuration Constants for Candide EIP-7702 ---
 // Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
@@ -44,8 +44,8 @@ const areCandideUrlsConfigured =
   !!ACTUAL_PAYMASTER_URL;
 // Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
 const CANDIDE_ENTRY_POINT_ADDRESS = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108";
-// Default delegatee for Simple7702Account
-const SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS = "0xe6Cae83BdE06E4c305530e199D7217f42808555B" as Address;
+// Default delegatee for Simple7702Account - Updated to custom contract address
+const SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS = "0xE2729634fc02E8c757fbb27F0d01228cd24022D2" as Address;
 
 
 function App() {
@@ -462,27 +462,53 @@ function App() {
         const rawTx = payload.params[0] as any;
         const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
 
-        if (!sanitizedTx.to) { // Contract Creation
-          console.error(`[${requestId}] Contract creation is not supported in EIP-7702 mode yet.`);
-          sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "Contract creation via EIP-7702 is not yet supported. Use a factory or disable EIP-7702 mode." } });
-          setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-          return;
-        }
-
-        // --- EIP-7702 Specific Logic Starts Here ---
         // Instantiate Simple7702Account using the SESSION account address
         const smartAccount = new Simple7702Account(
           eip7702SessionAccount.address, // Use session account address
           { entrypointAddress: CANDIDE_ENTRY_POINT_ADDRESS }
         );
 
-        // Prepare MetaTransaction (MD step 4.2.5)
-        const metaTx: MetaTransaction = {
-          to: sanitizedTx.to as Address, // We've ensured 'to' exists
-          value: sanitizedTx.value || 0n,
-          data: sanitizedTx.data || "0x",
-        };
-        console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702");
+        let metaTx: MetaTransaction;
+
+        if (!sanitizedTx.to) { // Contract Creation
+            console.log(`[${requestId}] Handling contract creation via EIP-7702 custom createContract method.`);
+            if (!sanitizedTx.data) {
+                throw new Error("Contract creation requested but no initCode (sanitizedTx.data) found.");
+            }
+            const initCodeFromFoundry = sanitizedTx.data as Hex;
+
+            // ABI for your createContract function
+            const createContractAbi = [{
+                type: 'function',
+                name: 'createContract',
+                inputs: [{ name: 'initCode', type: 'bytes' }],
+                // outputs: [{ name: 'newContract', type: 'address' }], // Optional: if your contract returns it
+                stateMutability: 'payable', // Or 'nonpayable' if it doesn't handle value
+            }] as const;
+
+            const callDataForCreateContract = encodeFunctionData({
+                abi: createContractAbi,
+                functionName: 'createContract',
+                args: [initCodeFromFoundry],
+            });
+
+            metaTx = {
+                to: eip7702SessionAccount.address, // Target the Simple7702Account itself
+                value: sanitizedTx.value || 0n,    // Pass through any value sent with the deployment
+                data: callDataForCreateContract,
+            };
+            console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702 contract creation");
+
+        } else { // Standard function call
+            metaTx = {
+                to: sanitizedTx.to as Address,
+                value: sanitizedTx.value || 0n,
+                data: sanitizedTx.data || "0x",
+            };
+            console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702 function call");
+        }
+
+        // --- EIP-7702 Specific Logic Continues from here with metaTx ---
 
         // Prepare & Sign EIP-7702 Authorization using the LOCAL wallet client
         // Nonce is for the SESSION account
