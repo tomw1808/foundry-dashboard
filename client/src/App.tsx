@@ -603,43 +603,49 @@ function App() {
 
         // Send UserOperation (using abstractionkit) (MD step 4.2.10)
         console.debug("Sending UserOperation to bundler...");
-        const sendUserOpResponse = await smartAccount.sendUserOperation(userOperation, ACTUAL_BUNDLER_URL); // Use configured Bundler URL
-        console.info(`UserOperation sent. UserOpHash from sendUserOpResponse: ${sendUserOpResponse.userOperationHash}`);
-        result = sendUserOpResponse.userOperationHash; // Store UserOpHash as the initial result
+        const sendUserOpResponse = await smartAccount.sendUserOperation(userOperation, ACTUAL_BUNDLER_URL);
+        const userOpHashForTracking = sendUserOpResponse.userOperationHash as Hex;
+        console.info(`UserOperation sent. UserOpHash for tracking: ${userOpHashForTracking}`);
 
-        // Asynchronously wait for UserOperation inclusion and update tracking
-        sendUserOpResponse.included()
-          .then(receiptResult => {
-            console.info(`UserOperation included. TxHash: ${receiptResult.receipt?.transactionHash}, Success: ${receiptResult.success}`);
-            setTrackedTxs(prevMap => {
-              const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
-              const existingTx = prevMap.get(userOpHashToUpdate);
-              if (existingTx) {
+        // Initial UI update: Add UserOp to trackedTxs with 'checking' status
+        // Ensure currentChainId and payload.decoded are available here
+        const currentChainIdForEip7702 = chainId; // Should be defined and checked earlier
+        const decodedInfoForEip7702 = payload.decoded;
+
+        if (currentChainIdForEip7702) {
+            const initialTrackedTx: TrackedTxInfo = {
+                hash: userOpHashForTracking,
+                status: 'checking', // Indicates we are waiting for UserOp inclusion
+                confirmations: 0,
+                timestamp: Date.now(),
+                chainId: currentChainIdForEip7702,
+                label: `EIP-7702 Session: ${generateTxLabel(decodedInfoForEip7702)} (UserOp)`,
+                // actualTxHash will be filled after inclusion
+            };
+            setTrackedTxs(prevMap => new Map(prevMap).set(userOpHashForTracking, initialTrackedTx));
+        }
+
+        console.log(`[${requestId}] UserOp ${userOpHashForTracking} sent! Waiting for inclusion...`);
+        const receiptResult = await sendUserOpResponse.included(); // Wait for the UserOp to be included
+
+        console.info(`[${requestId}] UserOperation ${userOpHashForTracking} included. TxHash: ${receiptResult.receipt?.transactionHash}, Success: ${receiptResult.success}`);
+        result = receiptResult.receipt?.transactionHash; // This is the actual tx hash to send back to Foundry
+
+        // Update trackedTxs with the final status and actual transaction hash
+        setTrackedTxs(prevMap => {
+            const existingTx = prevMap.get(userOpHashForTracking);
+            if (existingTx) {
                 const updatedTxInfo: TrackedTxInfo = {
-                  ...existingTx,
-                  status: receiptResult.success ? 'success' : 'reverted',
-                  blockNumber: receiptResult.receipt?.blockNumber,
-                  actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
-                  // contractAddress might need parsing from logs if it's a deployment via UserOp
+                    ...existingTx,
+                    status: receiptResult.success ? 'success' : 'reverted',
+                    blockNumber: receiptResult.receipt?.blockNumber,
+                    actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
+                    // contractAddress might need parsing from logs if it's a deployment via UserOp
                 };
-                return new Map(prevMap).set(userOpHashToUpdate, updatedTxInfo);
-              }
-              return prevMap;
-            });
-          })
-          .catch(inclusionError => {
-            console.error({ err: inclusionError, userOpHash: sendUserOpResponse.userOperationHash }, "Error waiting for UserOperation inclusion");
-            setTrackedTxs(prevMap => {
-              const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
-              const existingTx = prevMap.get(userOpHashToUpdate);
-              if (existingTx) {
-                // Mark as reverted on inclusion error, or keep as pending if a more specific error handling is desired
-                return new Map(prevMap).set(userOpHashToUpdate, { ...existingTx, status: 'reverted' });
-              }
-              return prevMap;
-            });
-          });
-        // The initial tracking entry (with 'pending' status) is handled by the common success logic below.
+                return new Map(prevMap).set(userOpHashForTracking, updatedTxInfo);
+            }
+            return prevMap; // Should ideally always find the existingTx
+        });
 
       } else {
         // --- Standard Flow (Non-EIP-7702 or conditions not met) ---
@@ -667,45 +673,59 @@ function App() {
       }
 
       const txHashOrUserOpHash = result as Hex; // This is UserOpHash for EIP-7702, TxHash for standard
-      const currentChainId = chainId; // Already checked for existence
-      const decodedInfo = request.payload.decoded;
+      const txHashFromFlow = result as Hex; // This is actualTxHash for EIP-7702, TxHash for standard
+      const currentChainIdForTracking = chainId; // Already checked for existence
+      const decodedInfoForTracking = request.payload.decoded;
 
-      if (txHashOrUserOpHash && currentChainId) {
-        // Determine label based on active mode
-        const txLabel = activeMode === 'eip7702' && chainId === 11155111
-          ? `EIP-7702 Session: ${generateTxLabel(decodedInfo)} (UserOp)`
-          : `Browser Wallet: ${generateTxLabel(decodedInfo)}`; // Default/Browser mode label
-
+      // For Browser Wallet mode, add the transaction to tracking.
+      // EIP-7702 mode handles its own tracking internally now.
+      if (activeMode === 'browser' && txHashFromFlow && currentChainIdForTracking) {
+        const txLabel = `Browser Wallet: ${generateTxLabel(decodedInfoForTracking)}`;
         const newTrackedTx: TrackedTxInfo = {
-          hash: txHashOrUserOpHash, // Store UserOpHash for EIP-7702, TxHash for standard
+          hash: txHashFromFlow,
           status: 'pending',
           confirmations: 0,
           timestamp: Date.now(),
-          chainId: currentChainId,
+          chainId: currentChainIdForTracking,
           label: txLabel,
-          // actualTxHash will be filled later for UserOps
         };
-        setTrackedTxs(prevMap => new Map(prevMap).set(txHashOrUserOpHash, newTrackedTx));
+        setTrackedTxs(prevMap => new Map(prevMap).set(txHashFromFlow, newTrackedTx));
       }
-      // --- End Add to Tracked Txs ---
+      // --- End Add to Tracked Txs for Browser Wallet ---
 
       // Remove the request from the UI *before* sending the response
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-      // Send success response back
+      // Send success response back (result is now actualTxHash for EIP-7702)
       sendSignResponse(currentWs, requestId, { result });
       setProcessedRequests(count => count + 1); // Increment counter on success
 
     } catch (err: any) {
-      // Remove the request from the UI *before* sending the error response
+      // If an error occurred during EIP-7702 flow, and we had a userOpHash, mark it as reverted.
+      if (activeMode === 'eip7702' && payload.params?.[0]) { // Check if it was an EIP-7702 attempt
+          // We need a way to get the userOpHash if it was generated before the error.
+          // This part is tricky if the error happens before userOpHash is obtained.
+          // For now, if an error is caught here, the initial 'checking' entry might remain.
+          // A more robust solution would involve passing userOpHashForTracking out of the EIP-7702 block's try-catch.
+          // However, if sendUserOpResponse.included() itself throws, the 'result' won't be set.
+          const userOpHashFromErrorContext = trackedTxs.forEach((tx) => { // Attempt to find it
+            if (tx.label.includes(generateTxLabel(payload.decoded)) && tx.status === 'checking') {
+              setTrackedTxs(prevMap => {
+                const existingTx = prevMap.get(tx.hash);
+                if (existingTx) {
+                  return new Map(prevMap).set(tx.hash, { ...existingTx, status: 'reverted' });
+                }
+                return prevMap;
+              });
+            }
+          });
+      }
+
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
       console.error(`Error signing/sending transaction for ${requestId}:`, err);
-      // Standard JSON-RPC error codes: https://eips.ethereum.org/EIPS/eip-1474#error-codes
-      // 4001 is user rejection
-      const errorCode = err.code === 4001 ? 4001 : -32000; // Use -32000 for generic internal errors
+      const errorCode = err.code === 4001 ? 4001 : -32000;
       const errorMessage = err.shortMessage || err.message || 'User rejected or transaction failed';
       sendSignResponse(currentWs, requestId, { error: { code: errorCode, message: errorMessage } });
     }
-    // Removed finally block as state update is now done before sending response/error
   };
 
   // --- Reject Transaction Handler ---
