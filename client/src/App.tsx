@@ -1,21 +1,19 @@
 import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi';
 import { useEffect, useState, useRef } from 'react';
-import { Address, BlockTag, Hex } from 'viem';
+import { Address, BlockTag, Hex, serializeSignature, toHex } from 'viem';
 
 // Import types and components
 import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types';
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
-import { parseSignature } from 'viem'; // EIP-7702
-// Helper from abstractionkit or replicate its bigintToHex logic if needed for eip7702Auth object
-const bigintToHexAK = (val: bigint): Hex => ('0x' + (val === 0n ? '0' : val.toString(16))) as Hex; // EIP-7702
+
 import { DashboardStatus } from '@/components/DashboardStatus';
 import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
 // import { Switch } from '@/components/ui/switch'; // No longer needed
 // import { Label } from '@/components/ui/label';   // No longer needed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // For new UI
-import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'; // For EIP-7702 session key
+import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
 import { createWalletClient, http } from 'viem'; // Added for local EIP-7702 client
 
@@ -40,7 +38,7 @@ const areCandideUrlsConfigured =
     !!ACTUAL_BUNDLER_URL && // Ensure they are not empty strings if env var is set to ""
     !!ACTUAL_PAYMASTER_URL;
 // Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
-const CANDIDE_ENTRY_POINT_ADDRESS = "0x0000000071727De22E5E9d8bAF0edAc6f37da032";
+const CANDIDE_ENTRY_POINT_ADDRESS = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108";
 // Default delegatee for Simple7702Account
 const SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS = "0xe6Cae83BdE06E4c305530e199D7217f42808555B" as Address;
 
@@ -495,28 +493,32 @@ function App() {
             // authority & executor: Using viem defaults.
         });
 
-        // Extract r, s, v directly from the result. No need for parseSignature.
-        const { r, s, v } = eip7702FullSignature;
+        console.debug({eip7702FullSignature}); //log the full signature
 
-        // Validate v and calculate yParity
-        if (typeof v !== 'bigint') {
-            throw new Error(`Invalid 'v' value received from signAuthorization: ${v}`);
-        }
-        const yParity = v - 27n; // 0n if v is 27, 1n if v is 28
-        if (yParity !== 0n && yParity !== 1n) {
-             throw new Error(`Calculated invalid yParity (${yParity}) from v (${v})`);
-        }
+        // Determining the yParity based on v is not necessary anymore, viem does that automatically.
+
+        // // Extract r, s, v directly from the result. No need for parseSignature.
+        // const { r, s, v } = eip7702FullSignature;
+
+        // // Validate v and calculate yParity
+        // if (typeof v !== 'bigint') {
+        //     throw new Error(`Invalid 'v' value received from signAuthorization: ${v}`);
+        // }
+        // const yParity = v - 27n; // 0n if v is 27, 1n if v is 28
+        // if (yParity !== 0n && yParity !== 1n) {
+        //      throw new Error(`Calculated invalid yParity (${yParity}) from v (${v})`);
+        // }
 
 
-        const eip7702AuthForUserOpOverride = { // Structure for abstractionkit's eip7702Auth override
-            chainId: BigInt(chainId), // Expected as bigint
-            address: eip7702SessionAccount.address, // Use session account address
-            nonce: BigInt(sessionAccountNonceForAuth),      // Use session account nonce
-            yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Convert 0n/1n to '0x00'/'0x01'
-            r: r, // Already Hex
-            s: s, // Already Hex
-        };
-        console.debug({ authData: eip7702AuthForUserOpOverride }, "Prepared EIP-7702 Auth data for UserOp override using session account");
+        // const eip7702AuthForUserOpOverride = { // Structure for abstractionkit's eip7702Auth override
+        //   chainId: BigInt(chainId), // Expected as bigint
+        //   address: eip7702SessionAccount.address, // Use session account address
+        //     nonce: BigInt(sessionAccountNonceForAuth),      // Use session account nonce
+        //     yParity: yParity === 0n ? '0x00' : '0x01' as '0x00' | '0x01', // Convert 0n/1n to '0x00'/'0x01'
+        //     r: r, // Already Hex
+        //     s: s, // Already Hex
+        // };
+        // console.debug({ authData: eip7702AuthForUserOpOverride }, "Prepared EIP-7702 Auth data for UserOp override using session account");
 
         // RPC URL for UserOperation creation (already determined as rpcUrlForSessionClient)
         const rpcUrlForUserOp = rpcUrlForSessionClient;
@@ -527,10 +529,15 @@ function App() {
             [metaTx],
             rpcUrlForUserOp,
             ACTUAL_BUNDLER_URL, // Use configured Bundler URL
-            { eip7702Auth: eip7702AuthForUserOpOverride }
+            { eip7702Auth: {
+              chainId: BigInt(chainId)
+            } }
         ) as UserOperationV8;
         console.debug({ userOp: userOperation }, "UserOperation created by abstractionkit");
+        delete eip7702FullSignature.v;
+        userOperation.eip7702Auth = {...eip7702FullSignature, chainId: toHex(chainId), nonce: toHex(sessionAccountNonceForAuth), yParity: eip7702FullSignature.yParity ? toHex(eip7702FullSignature.yParity) : "0x0"};
 
+        console.debug({ userOp: userOperation }, "UserOperation filled with eip7702Auth");
         // Paymaster Sponsorship (using abstractionkit) (MD step 4.2.8)
         console.debug("Applying paymaster sponsorship with CandidePaymaster...");
         const paymaster = new CandidePaymaster(ACTUAL_PAYMASTER_URL); // Use configured Paymaster URL
@@ -551,11 +558,14 @@ function App() {
         console.debug(`UserOperation hash to sign: ${userOpHash}`);
 
         console.debug("Signing UserOperation hash with LOCAL session walletClient...");
-        const userOpSignature = await localWalletClient.signMessage({
-            account: eip7702SessionAccount, // Sign with the session account
-            message: { raw: userOpHash as Hex },
-        });
+        //this does not work, as it prepends the message, using low-level sign instead.
+        // const userOpSignature = await localWalletClient.signMessage({
+        //     account: eip7702SessionAccount, // Sign with the session account
+        //     message: { raw: toHex(userOpHash) },
+        // });
+        const userOpSignature = serializeSignature(await sign({hash: userOpHash as Hex, privateKey: eip7702PrivateKey || "0x0"}));
         userOperation.signature = userOpSignature;
+        
         console.debug(`UserOperation signature obtained: ${userOpSignature}`);
 
         // Send UserOperation (using abstractionkit) (MD step 4.2.10)
@@ -579,7 +589,7 @@ function App() {
             , 2));
 
             console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
-            result = await walletClient.sendTransaction(sanitizedTx);
+            result = await walletClient?.sendTransaction(sanitizedTx);
             console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
         } else {
             // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
