@@ -439,6 +439,14 @@ function App() {
   };
 
   // --- Send Response back via WebSocket ---
+  // Helper function to handle BigInt serialization for JSON.stringify
+  const jsonReplacer = (_key: string, value: any) => {
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    return value;
+  };
+
   // Modify to accept the WebSocket instance as the first argument
   const sendRpcResponse = (socketInstance: WebSocket, requestId: string, response: { result?: any; error?: any }) => {
     // No need to check null here as handleRpcRequest already does, but check state
@@ -447,7 +455,7 @@ function App() {
         type: 'rpcResponse',
         requestId: requestId, // Use the requestId passed to this function
         ...response,
-      });
+      }, jsonReplacer); // Apply the replacer here
       // console.log(`Sending RPC Response for ${requestId}:`, message); // Reduce noise
       socketInstance.send(message);
     } else {
@@ -830,7 +838,7 @@ function App() {
         type: 'signResponse', // Use 'signResponse' type
         requestId: requestId,
         ...response,
-      });
+      }, jsonReplacer); // Apply the replacer here
       // console.log(`Sending Sign Response for ${requestId}:`, message); // Reduce noise
       socketInstance.send(message);
     } else {
