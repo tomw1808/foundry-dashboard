@@ -38,10 +38,10 @@ const ACTUAL_BUNDLER_URL = VITE_CANDIDE_SEPOLIA_BUNDLER_URL || BUNDLER_URL_PLACE
 const ACTUAL_PAYMASTER_URL = VITE_CANDIDE_SEPOLIA_PAYMASTER_URL || PAYMASTER_URL_PLACEHOLDER;
 
 const areCandideUrlsConfigured =
-    ACTUAL_BUNDLER_URL !== BUNDLER_URL_PLACEHOLDER &&
-    ACTUAL_PAYMASTER_URL !== PAYMASTER_URL_PLACEHOLDER &&
-    !!ACTUAL_BUNDLER_URL && // Ensure they are not empty strings if env var is set to ""
-    !!ACTUAL_PAYMASTER_URL;
+  ACTUAL_BUNDLER_URL !== BUNDLER_URL_PLACEHOLDER &&
+  ACTUAL_PAYMASTER_URL !== PAYMASTER_URL_PLACEHOLDER &&
+  !!ACTUAL_BUNDLER_URL && // Ensure they are not empty strings if env var is set to ""
+  !!ACTUAL_PAYMASTER_URL;
 // Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
 const CANDIDE_ENTRY_POINT_ADDRESS = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108";
 // Default delegatee for Simple7702Account
@@ -94,9 +94,9 @@ function App() {
           console.log('Received signRequest:', message.requestId, message.payload?.method); // Log key info
           // Add to pending requests state if not already present
           setPendingSignRequests((prev) =>
-             prev.find((req) => req.requestId === message.requestId)
-               ? prev
-               : [...prev, { requestId: message.requestId, payload: message.payload }]
+            prev.find((req) => req.requestId === message.requestId)
+              ? prev
+              : [...prev, { requestId: message.requestId, payload: message.payload }]
           );
         }
 
@@ -156,103 +156,103 @@ function App() {
   const POLLING_INTERVAL = 4000; // Check every 4 seconds
 
   useEffect(() => {
-      if (!publicClient || trackedTxs.size === 0 || !chainId) {
-          return; // No client, nothing to track, or chainId missing
-      }
+    if (!publicClient || trackedTxs.size === 0 || !chainId) {
+      return; // No client, nothing to track, or chainId missing
+    }
 
-      const intervalId = setInterval(async () => {
-          const pendingHashes = Array.from(trackedTxs.entries())
-              .filter(([_, tx]) => (tx.status === 'pending' || tx.status === 'checking') && tx.chainId === chainId) // Only poll for current chain
-              .map(([hash, _]) => hash);
+    const intervalId = setInterval(async () => {
+      const pendingHashes = Array.from(trackedTxs.entries())
+        .filter(([_, tx]) => (tx.status === 'pending' || tx.status === 'checking') && tx.chainId === chainId) // Only poll for current chain
+        .map(([hash, _]) => hash);
 
-          if (pendingHashes.length === 0) return;
+      if (pendingHashes.length === 0) return;
 
-          console.trace(`Polling receipts for ${pendingHashes.length} transactions on chain ${chainId}...`);
+      console.trace(`Polling receipts for ${pendingHashes.length} transactions on chain ${chainId}...`);
 
-          for (const hash of pendingHashes) {
-              const txInfo = trackedTxs.get(hash);
-              // Double check it's still pending/checking before fetching
-              if (!txInfo || (txInfo.status !== 'pending' && txInfo.status !== 'checking')) {
-                  continue;
-              }
+      for (const hash of pendingHashes) {
+        const txInfo = trackedTxs.get(hash);
+        // Double check it's still pending/checking before fetching
+        if (!txInfo || (txInfo.status !== 'pending' && txInfo.status !== 'checking')) {
+          continue;
+        }
 
-              // Mark as checking to avoid simultaneous fetches if interval is short
-              setTrackedTxs(prevMap => {
-                  const current = prevMap.get(hash);
-                  // Ensure it hasn't been updated by another process in the meantime
-                  if (current && (current.status === 'pending' || current.status === 'checking')) {
-                      return new Map(prevMap).set(hash, { ...current, status: 'checking' });
-                  }
-                  return prevMap; // No change needed
-              });
-
-
-              try {
-                  // Use the publicClient specific to the tx chainId if possible, else current
-                  // Note: This example uses the current publicClient, assuming polling only happens for the active chain.
-                  // For multi-chain support, you'd need clients per chainId.
-                  const receipt = await publicClient.getTransactionReceipt({ hash });
-
-                  if (receipt) {
-                      console.debug(`Receipt found for ${hash}: Status ${receipt.status}`);
-                      setTrackedTxs(prevMap => {
-                          const currentTx = prevMap.get(hash);
-                          if (!currentTx) return prevMap; // Should exist, but safety check
-                          return new Map(prevMap).set(hash, {
-                              ...currentTx,
-                              status: receipt.status, // 'success' or 'reverted'
-                              blockNumber: receipt.blockNumber,
-                              contractAddress: receipt.contractAddress,
-                          });
-                      });
-                      // Stop polling for this one once receipt is found
-                  } else {
-                      // Still pending, reset status from 'checking' back to 'pending'
-                      setTrackedTxs(prevMap => {
-                           const currentTx = prevMap.get(hash);
-                           if (!currentTx || currentTx.status !== 'checking') return prevMap;
-                           return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
-                      });
-                  }
-              } catch (error: any) {
-                  console.warn({ err: error, hash }, `Error fetching receipt for tx`);
-                  // Reset status back to pending on error to allow retry
-                   setTrackedTxs(prevMap => {
-                       const currentTx = prevMap.get(hash);
-                       if (!currentTx || currentTx.status !== 'checking') return prevMap;
-                       return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
-                  });
-              }
+        // Mark as checking to avoid simultaneous fetches if interval is short
+        setTrackedTxs(prevMap => {
+          const current = prevMap.get(hash);
+          // Ensure it hasn't been updated by another process in the meantime
+          if (current && (current.status === 'pending' || current.status === 'checking')) {
+            return new Map(prevMap).set(hash, { ...current, status: 'checking' });
           }
-      }, POLLING_INTERVAL);
+          return prevMap; // No change needed
+        });
 
-      return () => clearInterval(intervalId); // Cleanup interval on unmount or dependency change
+
+        try {
+          // Use the publicClient specific to the tx chainId if possible, else current
+          // Note: This example uses the current publicClient, assuming polling only happens for the active chain.
+          // For multi-chain support, you'd need clients per chainId.
+          const receipt = await publicClient.getTransactionReceipt({ hash });
+
+          if (receipt) {
+            console.debug(`Receipt found for ${hash}: Status ${receipt.status}`);
+            setTrackedTxs(prevMap => {
+              const currentTx = prevMap.get(hash);
+              if (!currentTx) return prevMap; // Should exist, but safety check
+              return new Map(prevMap).set(hash, {
+                ...currentTx,
+                status: receipt.status, // 'success' or 'reverted'
+                blockNumber: receipt.blockNumber,
+                contractAddress: receipt.contractAddress,
+              });
+            });
+            // Stop polling for this one once receipt is found
+          } else {
+            // Still pending, reset status from 'checking' back to 'pending'
+            setTrackedTxs(prevMap => {
+              const currentTx = prevMap.get(hash);
+              if (!currentTx || currentTx.status !== 'checking') return prevMap;
+              return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+            });
+          }
+        } catch (error: any) {
+          console.warn({ err: error, hash }, `Error fetching receipt for tx`);
+          // Reset status back to pending on error to allow retry
+          setTrackedTxs(prevMap => {
+            const currentTx = prevMap.get(hash);
+            if (!currentTx || currentTx.status !== 'checking') return prevMap;
+            return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+          });
+        }
+      }
+    }, POLLING_INTERVAL);
+
+    return () => clearInterval(intervalId); // Cleanup interval on unmount or dependency change
 
   }, [trackedTxs, publicClient, chainId]); // Re-run if trackedTxs, client or chain changes
 
 
   // --- Block Number Watching Effect ---
   useWatchBlockNumber({
-      onBlockNumber(blockNumber: bigint) { // blockNumber parameter is used directly below
-          console.trace(`New block received: ${blockNumber}`);
-          // Removed: setCurrentBlockNumber(blockNumber);
-          // Update confirmations for already confirmed transactions
-          setTrackedTxs(prevMap => {
-              const newMap = new Map(prevMap);
-              let changed = false;
-              newMap.forEach((tx, hash) => {
-                  // Only update confirmations if the tx is on the current chain
-                  if (tx.chainId === chainId && (tx.status === 'success' || tx.status === 'reverted') && tx.blockNumber) {
-                      const confs = Number(blockNumber - tx.blockNumber) + 1; // Calculate confirmations
-                      if (tx.confirmations !== confs) {
-                          newMap.set(hash, { ...tx, confirmations: confs });
-                          changed = true;
-                      }
-                  }
-              });
-              return changed ? newMap : prevMap; // Return new map only if changed
-          });
-      },
+    onBlockNumber(blockNumber: bigint) { // blockNumber parameter is used directly below
+      console.trace(`New block received: ${blockNumber}`);
+      // Removed: setCurrentBlockNumber(blockNumber);
+      // Update confirmations for already confirmed transactions
+      setTrackedTxs(prevMap => {
+        const newMap = new Map(prevMap);
+        let changed = false;
+        newMap.forEach((tx, hash) => {
+          // Only update confirmations if the tx is on the current chain
+          if (tx.chainId === chainId && (tx.status === 'success' || tx.status === 'reverted') && tx.blockNumber) {
+            const confs = Number(blockNumber - tx.blockNumber) + 1; // Calculate confirmations
+            if (tx.confirmations !== confs) {
+              newMap.set(hash, { ...tx, confirmations: confs });
+              changed = true;
+            }
+          }
+        });
+        return changed ? newMap : prevMap; // Return new map only if changed
+      });
+    },
   });
 
 
@@ -272,9 +272,9 @@ function App() {
       console.error(`${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
       // Attempt to send error back only if WS was open initially
       if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-         sendRpcResponse(currentWs, requestId, { error: { code: -32000, message: errorMsg } });
+        sendRpcResponse(currentWs, requestId, { error: { code: -32000, message: errorMsg } });
       } else {
-         console.warn(`Cannot send error response for ${requestId} because WebSocket is not open.`);
+        console.warn(`Cannot send error response for ${requestId} because WebSocket is not open.`);
       }
       return;
     }
@@ -292,8 +292,8 @@ function App() {
           result = [address];
           break;
         case 'eth_requestAccounts': // Often used by dapps, similar to eth_accounts
-           result = [address];
-           break;
+          result = [address];
+          break;
         case 'eth_getTransactionCount':
           try {
             // Extract address and block tag from params (handle potential undefined)
@@ -309,9 +309,9 @@ function App() {
             console.log(`[${requestId}] Attempting to fetch nonce for ${targetAddress} at block ${blockTag || 'pending'} using publicClient...`);
             // Add a specific check for publicClient just before using it
             if (!publicClient) {
-               console.error(`[${requestId}] publicClient is null or undefined when trying eth_getTransactionCount!`);
-               error = { code: -32603, message: 'Internal error: publicClient not available' };
-               break; // Exit case
+              console.error(`[${requestId}] publicClient is null or undefined when trying eth_getTransactionCount!`);
+              error = { code: -32603, message: 'Internal error: publicClient not available' };
+              break; // Exit case
             }
 
             const nonce = await publicClient.getTransactionCount({
@@ -338,10 +338,10 @@ function App() {
           console.warn(`Unhandled RPC method in switch: ${payload.method}. Attempting direct request via window.ethereum.`);
           // Fallback for methods not explicitly handled (use with caution)
           try {
-             result = await window.ethereum?.request({ method: payload.method, params: payload.params });
+            result = await window.ethereum?.request({ method: payload.method, params: payload.params });
           } catch (err: any) {
-             console.error(`Error handling method ${payload.method} directly:`, err);
-             error = { code: err.code || -32603, message: err.message || 'Internal JSON-RPC error' };
+            console.error(`Error handling method ${payload.method} directly:`, err);
+            error = { code: err.code || -32603, message: err.message || 'Internal JSON-RPC error' };
           }
       }
 
@@ -388,54 +388,54 @@ function App() {
 
     // Basic checks needed regardless of mode
     if (!currentWs || currentWs.readyState !== WebSocket.OPEN || !chainId || !publicClient) {
-        const reason = !currentWs || currentWs.readyState !== WebSocket.OPEN ? 'WebSocket not open'
-                     : !chainId ? 'Chain ID not available'
-                     : 'Public client not available';
-        console.error(`${reason}, cannot sign transaction for ${requestId}`);
-        if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
-        }
-        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-        return;
+      const reason = !currentWs || currentWs.readyState !== WebSocket.OPEN ? 'WebSocket not open'
+        : !chainId ? 'Chain ID not available'
+          : 'Public client not available';
+      console.error(`${reason}, cannot sign transaction for ${requestId}`);
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+      }
+      setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+      return;
     }
 
     // Mode-specific checks
     if (activeMode === 'browser') {
-        // Browser mode requires connected browser wallet
-        if (!walletClient || !address) {
-            const reason = !walletClient ? 'Browser wallet client not available' : 'Browser wallet address not available';
-            console.error(`${reason}, cannot sign transaction in Browser Wallet mode for ${requestId}`);
-            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
-            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-            return;
-        }
+      // Browser mode requires connected browser wallet
+      if (!walletClient || !address) {
+        const reason = !walletClient ? 'Browser wallet client not available' : 'Browser wallet address not available';
+        console.error(`${reason}, cannot sign transaction in Browser Wallet mode for ${requestId}`);
+        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        return;
+      }
     } else if (activeMode === 'eip7702') {
-        // EIP-7702 mode requires a session account and configured URLs (for Sepolia)
-        if (!eip7702SessionAccount) {
-            const reason = 'EIP-7702 session account not available. Generate or set a private key.';
-            console.error(`${reason}, cannot sign transaction in EIP-7702 mode for ${requestId}`);
-            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
-            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-            return;
-        }
-        if (chainId === 11155111 && !areCandideUrlsConfigured) {
-            const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
-            console.error(`[${requestId}] ${configErrorMessage}`);
-            setEip7702ConfigError(configErrorMessage); // Show error in UI
-            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
-            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-            // Do not disable the mode here, just prevent the transaction
-            return;
-        }
+      // EIP-7702 mode requires a session account and configured URLs (for Sepolia)
+      if (!eip7702SessionAccount) {
+        const reason = 'EIP-7702 session account not available. Generate or set a private key.';
+        console.error(`${reason}, cannot sign transaction in EIP-7702 mode for ${requestId}`);
+        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        return;
+      }
+      if (chainId === 11155111 && !areCandideUrlsConfigured) {
+        const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
+        console.error(`[${requestId}] ${configErrorMessage}`);
+        setEip7702ConfigError(configErrorMessage); // Show error in UI
+        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
+        setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        // Do not disable the mode here, just prevent the transaction
+        return;
+      }
     }
 
     // Determine RPC URL for local client creation if needed
     let rpcUrlForSessionClient = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback
     if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
-        const clientRpcUrl = publicClient.transport.config.url;
-        if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
-            rpcUrlForSessionClient = clientRpcUrl;
-        }
+      const clientRpcUrl = publicClient.transport.config.url;
+      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+        rpcUrlForSessionClient = clientRpcUrl;
+      }
     }
 
     try {
@@ -447,40 +447,40 @@ function App() {
 
         // Create a local WalletClient for the session account
         const localWalletClient = createWalletClient({
-            account: eip7702SessionAccount,
-            chain: publicClient.chain, // Use the chain object from the public client
-            transport: http(rpcUrlForSessionClient)
+          account: eip7702SessionAccount,
+          chain: publicClient.chain, // Use the chain object from the public client
+          transport: http(rpcUrlForSessionClient)
         });
         console.debug(`[${requestId}] Created local WalletClient for session account.`);
 
 
         if (payload.method !== 'eth_sendTransaction' || !payload.params?.[0]) {
-            sendSignResponse(currentWs, requestId, { error: { code: -32602, message: "EIP-7702 flow currently only supports eth_sendTransaction." } });
-            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-            throw new Error("EIP-7702 flow currently only supports eth_sendTransaction.");
+          sendSignResponse(currentWs, requestId, { error: { code: -32602, message: "EIP-7702 flow currently only supports eth_sendTransaction." } });
+          setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+          throw new Error("EIP-7702 flow currently only supports eth_sendTransaction.");
         }
         const rawTx = payload.params[0] as any;
         const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
 
         if (!sanitizedTx.to) { // Contract Creation
-            console.error(`[${requestId}] Contract creation is not supported in EIP-7702 mode yet.`);
-            sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "Contract creation via EIP-7702 is not yet supported. Use a factory or disable EIP-7702 mode." } });
-            setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-            return;
+          console.error(`[${requestId}] Contract creation is not supported in EIP-7702 mode yet.`);
+          sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "Contract creation via EIP-7702 is not yet supported. Use a factory or disable EIP-7702 mode." } });
+          setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+          return;
         }
 
         // --- EIP-7702 Specific Logic Starts Here ---
         // Instantiate Simple7702Account using the SESSION account address
         const smartAccount = new Simple7702Account(
-            eip7702SessionAccount.address, // Use session account address
-            { entrypointAddress: CANDIDE_ENTRY_POINT_ADDRESS }
+          eip7702SessionAccount.address, // Use session account address
+          { entrypointAddress: CANDIDE_ENTRY_POINT_ADDRESS }
         );
 
         // Prepare MetaTransaction (MD step 4.2.5)
         const metaTx: MetaTransaction = {
-            to: sanitizedTx.to as Address, // We've ensured 'to' exists
-            value: sanitizedTx.value || 0n,
-            data: sanitizedTx.data || "0x",
+          to: sanitizedTx.to as Address, // We've ensured 'to' exists
+          value: sanitizedTx.value || 0n,
+          data: sanitizedTx.data || "0x",
         };
         console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702");
 
@@ -491,14 +491,14 @@ function App() {
 
         console.debug(`Signing EIP-7702 Auth: SessionAccount=${eip7702SessionAccount.address}, DesignatedContract=${designatedContractAddress}, SessionAccountAuthNonce=${sessionAccountNonceForAuth}`);
         const eip7702FullSignature = await localWalletClient.signAuthorization({
-            account: eip7702SessionAccount, // Sign with the session account
-            contractAddress: designatedContractAddress,
-            nonce: sessionAccountNonceForAuth,
-            chainId: chainId,
-            // authority & executor: Using viem defaults.
+          account: eip7702SessionAccount, // Sign with the session account
+          contractAddress: designatedContractAddress,
+          nonce: sessionAccountNonceForAuth,
+          chainId: chainId,
+          // authority & executor: Using viem defaults.
         });
 
-        console.debug({eip7702FullSignature}); //log the full signature
+        console.debug({ eip7702FullSignature }); //log the full signature
 
         // Determining the yParity based on v is not necessary anymore, viem does that automatically.
 
@@ -531,24 +531,26 @@ function App() {
         // Create UserOperation (using abstractionkit) (MD step 4.2.7)
         console.debug(`Creating UserOperation with abstractionkit using RPC: ${rpcUrlForUserOp}, Bundler: ${ACTUAL_BUNDLER_URL}`);
         let userOperation = await smartAccount.createUserOperation(
-            [metaTx],
-            rpcUrlForUserOp,
-            ACTUAL_BUNDLER_URL, // Use configured Bundler URL
-            { eip7702Auth: {
+          [metaTx],
+          rpcUrlForUserOp,
+          ACTUAL_BUNDLER_URL, // Use configured Bundler URL
+          {
+            eip7702Auth: {
               chainId: BigInt(chainId)
-            } }
+            }
+          }
         ) as UserOperationV8;
         console.debug({ userOp: userOperation }, "UserOperation created by abstractionkit");
         delete eip7702FullSignature.v;
-        userOperation.eip7702Auth = {...eip7702FullSignature, chainId: toHex(chainId), nonce: toHex(sessionAccountNonceForAuth), yParity: eip7702FullSignature.yParity ? toHex(eip7702FullSignature.yParity) : "0x0"};
+        userOperation.eip7702Auth = { ...eip7702FullSignature, chainId: toHex(chainId), nonce: toHex(sessionAccountNonceForAuth), yParity: eip7702FullSignature.yParity ? toHex(eip7702FullSignature.yParity) : "0x0" };
 
         console.debug({ userOp: userOperation }, "UserOperation filled with eip7702Auth");
         // Paymaster Sponsorship (using abstractionkit) (MD step 4.2.8)
         console.debug("Applying paymaster sponsorship with CandidePaymaster...");
         const paymaster = new CandidePaymaster(ACTUAL_PAYMASTER_URL); // Use configured Paymaster URL
         const [paymasterUserOperation, sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
-            userOperation,
-            ACTUAL_BUNDLER_URL, // Bundler URL is needed by the paymaster service
+          userOperation,
+          ACTUAL_BUNDLER_URL, // Bundler URL is needed by the paymaster service
         );
         userOperation = paymasterUserOperation as UserOperationV8; // Update userOperation with paymaster data
         console.debug({ userOp: userOperation, sponsorMeta: sponsorMetadata }, "UserOperation after paymaster sponsorship");
@@ -556,9 +558,9 @@ function App() {
         // Sign UserOperation (for Simple7702Account) (MD step 4.2.9)
         console.debug("Getting UserOperation hash for signing...");
         const userOpHash = await createUserOperationHash(
-            userOperation,
-            CANDIDE_ENTRY_POINT_ADDRESS, // Ensure this matches the entrypoint Simple7702Account uses
-            BigInt(chainId)
+          userOperation,
+          CANDIDE_ENTRY_POINT_ADDRESS, // Ensure this matches the entrypoint Simple7702Account uses
+          BigInt(chainId)
         );
         console.debug(`UserOperation hash to sign: ${userOpHash}`);
 
@@ -568,9 +570,9 @@ function App() {
         //     account: eip7702SessionAccount, // Sign with the session account
         //     message: { raw: toHex(userOpHash) },
         // });
-        const userOpSignature = serializeSignature(await sign({hash: userOpHash as Hex, privateKey: eip7702PrivateKey || "0x0"}));
+        const userOpSignature = serializeSignature(await sign({ hash: userOpHash as Hex, privateKey: eip7702PrivateKey || "0x0" }));
         userOperation.signature = userOpSignature;
-        
+
         console.debug(`UserOperation signature obtained: ${userOpSignature}`);
 
         // Send UserOperation (using abstractionkit) (MD step 4.2.10)
@@ -581,60 +583,60 @@ function App() {
 
         // Asynchronously wait for UserOperation inclusion and update tracking
         sendUserOpResponse.included()
-            .then(receiptResult => {
-                console.info(`UserOperation included. TxHash: ${receiptResult.receipt?.transactionHash}, Success: ${receiptResult.success}`);
-                setTrackedTxs(prevMap => {
-                    const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
-                    const existingTx = prevMap.get(userOpHashToUpdate);
-                    if (existingTx) {
-                        const updatedTxInfo: TrackedTxInfo = {
-                            ...existingTx,
-                            status: receiptResult.success ? 'success' : 'reverted',
-                            blockNumber: receiptResult.receipt?.blockNumber,
-                            actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
-                            // contractAddress might need parsing from logs if it's a deployment via UserOp
-                        };
-                        return new Map(prevMap).set(userOpHashToUpdate, updatedTxInfo);
-                    }
-                    return prevMap;
-                });
-            })
-            .catch(inclusionError => {
-                console.error({ err: inclusionError, userOpHash: sendUserOpResponse.userOperationHash }, "Error waiting for UserOperation inclusion");
-                setTrackedTxs(prevMap => {
-                    const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
-                    const existingTx = prevMap.get(userOpHashToUpdate);
-                    if (existingTx) {
-                        // Mark as reverted on inclusion error, or keep as pending if a more specific error handling is desired
-                        return new Map(prevMap).set(userOpHashToUpdate, { ...existingTx, status: 'reverted' });
-                    }
-                    return prevMap;
-                });
+          .then(receiptResult => {
+            console.info(`UserOperation included. TxHash: ${receiptResult.receipt?.transactionHash}, Success: ${receiptResult.success}`);
+            setTrackedTxs(prevMap => {
+              const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
+              const existingTx = prevMap.get(userOpHashToUpdate);
+              if (existingTx) {
+                const updatedTxInfo: TrackedTxInfo = {
+                  ...existingTx,
+                  status: receiptResult.success ? 'success' : 'reverted',
+                  blockNumber: receiptResult.receipt?.blockNumber,
+                  actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
+                  // contractAddress might need parsing from logs if it's a deployment via UserOp
+                };
+                return new Map(prevMap).set(userOpHashToUpdate, updatedTxInfo);
+              }
+              return prevMap;
             });
+          })
+          .catch(inclusionError => {
+            console.error({ err: inclusionError, userOpHash: sendUserOpResponse.userOperationHash }, "Error waiting for UserOperation inclusion");
+            setTrackedTxs(prevMap => {
+              const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
+              const existingTx = prevMap.get(userOpHashToUpdate);
+              if (existingTx) {
+                // Mark as reverted on inclusion error, or keep as pending if a more specific error handling is desired
+                return new Map(prevMap).set(userOpHashToUpdate, { ...existingTx, status: 'reverted' });
+              }
+              return prevMap;
+            });
+          });
         // The initial tracking entry (with 'pending' status) is handled by the common success logic below.
 
       } else {
         // --- Standard Flow (Non-EIP-7702 or conditions not met) ---
         if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
-            const rawTx = payload.params[0] as any;
-            const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
+          const rawTx = payload.params[0] as any;
+          const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
 
-            console.log(`[${requestId}] Sanitized transaction object for standard flow:`, JSON.stringify(sanitizedTx, (_key, value) =>
-                typeof value === 'bigint' ? value.toString() : value
+          console.log(`[${requestId}] Sanitized transaction object for standard flow:`, JSON.stringify(sanitizedTx, (_key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
             , 2));
 
-            console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
-            result = await walletClient?.sendTransaction(sanitizedTx);
-            console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
+          console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
+          result = await walletClient?.sendTransaction(sanitizedTx);
+          console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
         } else {
-            // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
-         // Example:
-         // if (payload.method === 'personal_sign' && payload.params?.[0] && payload.params?.[1]) {
-         //   const message = payload.params[0];
-         //   const account = payload.params[1] as Address;
-         //   result = await walletClient.signMessage({ account, message });
-         // } else { ... }
-         throw new Error(`Unsupported signing method: ${payload.method}`);
+          // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
+          // Example:
+          // if (payload.method === 'personal_sign' && payload.params?.[0] && payload.params?.[1]) {
+          //   const message = payload.params[0];
+          //   const account = payload.params[1] as Address;
+          //   result = await walletClient.signMessage({ account, message });
+          // } else { ... }
+          throw new Error(`Unsupported signing method: ${payload.method}`);
         }
       }
 
@@ -643,21 +645,21 @@ function App() {
       const decodedInfo = request.payload.decoded;
 
       if (txHashOrUserOpHash && currentChainId) {
-          // Determine label based on active mode
-          const txLabel = activeMode === 'eip7702' && chainId === 11155111
-              ? `EIP-7702 Session: ${generateTxLabel(decodedInfo)} (UserOp)`
-              : `Browser Wallet: ${generateTxLabel(decodedInfo)}`; // Default/Browser mode label
+        // Determine label based on active mode
+        const txLabel = activeMode === 'eip7702' && chainId === 11155111
+          ? `EIP-7702 Session: ${generateTxLabel(decodedInfo)} (UserOp)`
+          : `Browser Wallet: ${generateTxLabel(decodedInfo)}`; // Default/Browser mode label
 
-          const newTrackedTx: TrackedTxInfo = {
-              hash: txHashOrUserOpHash, // Store UserOpHash for EIP-7702, TxHash for standard
-              status: 'pending',
-              confirmations: 0,
-              timestamp: Date.now(),
-              chainId: currentChainId,
-              label: txLabel,
-              // actualTxHash will be filled later for UserOps
-          };
-          setTrackedTxs(prevMap => new Map(prevMap).set(txHashOrUserOpHash, newTrackedTx));
+        const newTrackedTx: TrackedTxInfo = {
+          hash: txHashOrUserOpHash, // Store UserOpHash for EIP-7702, TxHash for standard
+          status: 'pending',
+          confirmations: 0,
+          timestamp: Date.now(),
+          chainId: currentChainId,
+          label: txLabel,
+          // actualTxHash will be filled later for UserOps
+        };
+        setTrackedTxs(prevMap => new Map(prevMap).set(txHashOrUserOpHash, newTrackedTx));
       }
       // --- End Add to Tracked Txs ---
 
@@ -690,7 +692,7 @@ function App() {
         error: { code: 4001, message: 'User rejected the request.' }
       });
     } else {
-       console.warn(`Cannot send rejection for ${requestId} because WebSocket is not open.`);
+      console.warn(`Cannot send rejection for ${requestId} because WebSocket is not open.`);
     }
     // Remove the request from the UI
     setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
@@ -716,10 +718,10 @@ function App() {
   // Determine RPC URL for potential local client use
   let rpcUrlForLocalClient = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback for Sepolia
   if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
-      const clientRpcUrl = publicClient.transport.config.url;
-      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
-          rpcUrlForLocalClient = clientRpcUrl;
-      }
+    const clientRpcUrl = publicClient.transport.config.url;
+    if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+      rpcUrlForLocalClient = clientRpcUrl;
+    }
   }
 
 
@@ -727,108 +729,125 @@ function App() {
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
       {/* Replace Header with Tabs */}
       <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700 mb-6">
-          <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
-          {/* ConnectButton will be moved into the Browser Wallet tab */}
+        <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
+        {/* ConnectButton will be moved into the Browser Wallet tab */}
       </header>
 
       {/* Dashboard Status moved above tabs */}
       <div className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mb-6">
         <h2 className="text-xl mb-4">Dashboard Status</h2>
         <DashboardStatus
-            wsStatus={wsStatus}
-            isConnected={isConnected}
-            address={address} // Pass browser wallet address here
-            chainId={chainId}
-            processedRequests={processedRequests}
-            copyToClipboard={copyToClipboard}
+          wsStatus={wsStatus}
+          isConnected={isConnected}
+          address={address} // Pass browser wallet address here
+          chainId={chainId}
+          processedRequests={processedRequests}
+          copyToClipboard={copyToClipboard}
         />
       </div>
 
 
       <main className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg">
         <Tabs value={activeMode} onValueChange={(value) => setActiveMode(value as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="browser">Browser Wallet</TabsTrigger>
-                <TabsTrigger value="eip7702" disabled={!isConnected || chainId !== 11155111}>
-                    EIP-7702 Session
-                    {(!isConnected || chainId !== 11155111) && <span className="text-xs text-yellow-500 ml-1">(Sepolia Only)</span>}
-                </TabsTrigger>
-                <TabsTrigger value="erc4337" disabled>ERC-4337 (Soon)</TabsTrigger>
-            </TabsList>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="browser">Browser Wallet</TabsTrigger>
+            <TabsTrigger value="eip7702" disabled={!isConnected || chainId !== 11155111}>
+              EIP-7702 Sponsored
+              {(!isConnected || chainId !== 11155111) && <span className="text-xs text-yellow-500 ml-1">(Sepolia Only)</span>}
+            </TabsTrigger>
+            <TabsTrigger value="erc4337" disabled>ERC-4337 (Soon)</TabsTrigger>
+          </TabsList>
 
-            {/* Content for Browser Wallet Mode (Default) */}
-            <TabsContent value="browser">
-                <div className="space-y-4">
-                    <p className="text-sm text-gray-400">
-                        Standard mode: Transactions are signed and sent directly by your connected browser wallet.
-                    </p>
-                    <div className="flex items-center space-x-4 p-3 bg-gray-700/50 rounded-md">
-                        <ConnectButton />
-                        {isConnected && address && (
-                            <div className="flex items-center space-x-2">
-                                <span className="font-mono text-sm text-gray-300 truncate" title={address}>{address}</span>
-                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(address)} title="Copy Address">
-                                    <Copy size={16} />
-                                </Button>
-                            </div>
-                        )}
+          {/* Content for Browser Wallet Mode (Default) */}
+          <TabsContent value="browser">
+            <div className="space-y-4">
+              <p className="text-sm text-gray-400">
+                Standard mode: Transactions are signed and sent directly by your connected browser wallet.
+              </p>
+              <div className="flex flex-col items-left gap-4 justify-between space-x-4 p-3 bg-gray-700/50 rounded-md">
+                <ConnectButton />
+                {isConnected && address && (
+                  <div className='flex flex-col'>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-sm text-gray-300 truncate" title={address}>{address}</span>
+                      <Button variant="ghost" size="icon" onClick={() => copyToClipboard(address)} title="Copy Address">
+                        <Copy size={16} />
+                      </Button>
                     </div>
-                </div>
-            </TabsContent>
+                    <div className='text-sm text-gray-300'>
+                      
+                        Call the Foundry-Script with
+                      
+                        <span className='font-mono pl-2'>
+                        forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {address} --unlocked 
+                        </span> <Button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${address} --unlocked`)} title="Copy command" variant="ghost" size="icon" >
+                          <Copy size={16} />
+                        </Button>
+                      
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
-            {/* Content for EIP-7702 Mode */}
-            <TabsContent value="eip7702">
-                 <Eip7702ModeDisplay
-                    privateKey={eip7702PrivateKey}
-                    sessionAccount={eip7702SessionAccount}
-                    setPrivateKey={setEip7702PrivateKey}
-                    rpcUrl={rpcUrlForLocalClient} // This prop might not be actively used by Eip7702ModeDisplay currently
-                    chainId={chainId} // This prop might not be actively used by Eip7702ModeDisplay currently
-                 />
-                 <Alert className="mt-6 border-blue-500 bg-blue-900/30 text-blue-200">
-                    <Terminal className="h-4 w-4 !text-blue-400" />
-                    <AlertTitle className="text-blue-300">Tip: Deterministic Deployments with Factories</AlertTitle>
-                    <AlertDescription className="text-sm text-blue-300/90 space-y-2">
-                        <p>
-                            For EIP-7702 (and ERC-4337) smart accounts, contract deployments must go through the account's `execute` function.
-                            Direct `new MyContract()` in Foundry scripts won't work as expected with these account types.
-                        </p>
-                        <p>
-                            Instead, use a factory contract like <a href="https://crearex.xyz/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-100">CreateX</a> (or a similar CREATE/CREATE2 factory) to deploy your contracts.
-                            This gives you a deterministic address.
-                        </p>
-                        <p>
-                            Your Foundry script would then call the factory's deployment function (e.g., `createx.create(bytecode)` or `createx.create2(salt, bytecode)`),
-                            and this call becomes the `MetaTransaction` for your EIP-7702 UserOperation.
-                        </p>
-                        <p>
-                            Example: `vm.tx(factory.create(type(MyContract).creationCode));`
-                        </p>
-                    </AlertDescription>
-                </Alert>
-            </TabsContent>
+          {/* Content for EIP-7702 Mode */}
+          <TabsContent value="eip7702">
+            <Eip7702ModeDisplay
+              privateKey={eip7702PrivateKey}
+              sessionAccount={eip7702SessionAccount}
+              setPrivateKey={setEip7702PrivateKey}
+              rpcUrl={rpcUrlForLocalClient} // This prop might not be actively used by Eip7702ModeDisplay currently
+              chainId={chainId} // This prop might not be actively used by Eip7702ModeDisplay currently
+            />
+            <Alert className="mt-6 border-blue-500 bg-blue-900/30 text-blue-200">
+              <Terminal className="h-4 w-4 !text-blue-400" />
+              <AlertTitle className="text-blue-300">Tip: Deterministic Deployments with Factories</AlertTitle>
+              <AlertDescription className="text-sm text-blue-300/90 space-y-2">
+                <p>
+                  For EIP-7702 (and ERC-4337) smart accounts, contract deployments must go through the account's `execute` function.
+                  Direct `new MyContract()` in Foundry scripts won't work as expected with these account types.
+                </p>
+                <p>
+                  Instead, use a factory contract like <a href="https://book.getfoundry.sh/guides/deterministic-deployments-using-create2" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-100">Deterministic Deployer</a> (or a similar CREATE/CREATE2 factory) to deploy your contracts.
+                  This gives you a deterministic address: simply add a salt to the contract instance.
+                </p>
+                
+                <p className='text-mono'>
+                  <code><blockquote>
+                  {'Counter counter = new Counter\{salt: salt\}();'}
+                  </blockquote></code>
+                </p>
+                <p>
+                  Call the Foundry-Script with `forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {eip7702SessionAccount?.address} --unlocked`  <button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${eip7702SessionAccount?.address} --unlocked`)} title="Copy Address" className="text-gray-500 hover:text-white">
+                    <Copy size={14} />
+                  </button>
+                </p>
+              </AlertDescription>
+            </Alert>
+          </TabsContent>
 
-             {/* Content for ERC-4337 Mode */}
-            <TabsContent value="erc4337">
-                <p className="text-center text-gray-500 italic mt-8">Full ERC-4337 Smart Account support coming soon...</p>
-            </TabsContent>
+          {/* Content for ERC-4337 Mode */}
+          <TabsContent value="erc4337">
+            <p className="text-center text-gray-500 italic mt-8">Full ERC-4337 Smart Account support coming soon...</p>
+          </TabsContent>
 
         </Tabs>
 
         {/* Common Sections - Shown regardless of tab, below the specific tab content */}
         {/* PendingActionsList and TrackedTransactionsList are now general */}
         <PendingActionsList
-            pendingSignRequests={pendingSignRequests}
-            handleSignTransaction={handleSignTransaction}
-            handleRejectTransaction={handleRejectTransaction}
-            walletClient={walletClient}
-            isConnected={isConnected}
+          pendingSignRequests={pendingSignRequests}
+          handleSignTransaction={handleSignTransaction}
+          handleRejectTransaction={handleRejectTransaction}
+          walletClient={walletClient}
+          isConnected={isConnected}
         />
 
         <TrackedTransactionsList
-            trackedTxs={trackedTxs}
-            getExplorerLink={getExplorerLink}
-            copyToClipboard={copyToClipboard}
+          trackedTxs={trackedTxs}
+          getExplorerLink={getExplorerLink}
+          copyToClipboard={copyToClipboard}
         />
 
       </main>
