@@ -574,9 +574,39 @@ function App() {
         console.info(`UserOperation sent. UserOpHash from sendUserOpResponse: ${sendUserOpResponse.userOperationHash}`);
         result = sendUserOpResponse.userOperationHash; // Store UserOpHash as the initial result
 
-        // TODO: Implement full EIP-7702 logic here (Steps from MD 4.2.11 onwards - tracking)
-        // The next step is to handle the asynchronous update of tracking with the inclusion result.
-        // The initial tracking entry is handled by the common success logic below.
+        // Asynchronously wait for UserOperation inclusion and update tracking
+        sendUserOpResponse.included()
+            .then(receiptResult => {
+                console.info(`UserOperation included. TxHash: ${receiptResult.receipt?.transactionHash}, Success: ${receiptResult.success}`);
+                setTrackedTxs(prevMap => {
+                    const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
+                    const existingTx = prevMap.get(userOpHashToUpdate);
+                    if (existingTx) {
+                        const updatedTxInfo: TrackedTxInfo = {
+                            ...existingTx,
+                            status: receiptResult.success ? 'success' : 'reverted',
+                            blockNumber: receiptResult.receipt?.blockNumber,
+                            actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
+                            // contractAddress might need parsing from logs if it's a deployment via UserOp
+                        };
+                        return new Map(prevMap).set(userOpHashToUpdate, updatedTxInfo);
+                    }
+                    return prevMap;
+                });
+            })
+            .catch(inclusionError => {
+                console.error({ err: inclusionError, userOpHash: sendUserOpResponse.userOperationHash }, "Error waiting for UserOperation inclusion");
+                setTrackedTxs(prevMap => {
+                    const userOpHashToUpdate = sendUserOpResponse.userOperationHash as Hex;
+                    const existingTx = prevMap.get(userOpHashToUpdate);
+                    if (existingTx) {
+                        // Mark as reverted on inclusion error, or keep as pending if a more specific error handling is desired
+                        return new Map(prevMap).set(userOpHashToUpdate, { ...existingTx, status: 'reverted' });
+                    }
+                    return prevMap;
+                });
+            });
+        // The initial tracking entry (with 'pending' status) is handled by the common success logic below.
 
       } else {
         // --- Standard Flow (Non-EIP-7702 or conditions not met) ---
