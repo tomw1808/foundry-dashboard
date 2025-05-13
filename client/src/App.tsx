@@ -419,7 +419,6 @@ function App() {
       if (chainId === 11155111 && !areCandideUrlsConfigured) {
         const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
         console.error(`[${requestId}] ${configErrorMessage}`);
-        setEip7702ConfigError(configErrorMessage); // Show error in UI
         sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
         setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
         // Do not disable the mode here, just prevent the transaction
@@ -622,6 +621,7 @@ function App() {
             };
             setTrackedTxs(prevMap => new Map(prevMap).set(userOpHashForTracking, initialTrackedTx));
         }
+        console.log({sendUserOpResponse})
 
         console.log(`[${requestId}] UserOp ${userOpHashForTracking} sent! Waiting for inclusion...`);
         const receiptResult = await sendUserOpResponse.included(); // Wait for the UserOp to be included
