@@ -707,7 +707,7 @@ function App() {
           // For now, if an error is caught here, the initial 'checking' entry might remain.
           // A more robust solution would involve passing userOpHashForTracking out of the EIP-7702 block's try-catch.
           // However, if sendUserOpResponse.included() itself throws, the 'result' won't be set.
-          const userOpHashFromErrorContext = trackedTxs.forEach((tx) => { // Attempt to find it
+          trackedTxs.forEach((tx) => { // Attempt to find and update the UserOp status
             if (tx.label.includes(generateTxLabel(payload.decoded)) && tx.status === 'checking') {
               setTrackedTxs(prevMap => {
                 const existingTx = prevMap.get(tx.hash);
