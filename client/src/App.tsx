@@ -839,11 +839,11 @@ function App() {
                   This gives you a deterministic address: simply add a salt to the contract instance.
                 </p>
                 
-                <p className='text-mono'>
+                <div className='text-mono'>
                   <code><blockquote>
                   {'Counter counter = new Counter\{salt: salt\}();'}
                   </blockquote></code>
-                </p>
+                </div>
                 <p>
                   Call the Foundry-Script with `forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {eip7702SessionAccount?.address} --unlocked`  <button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${eip7702SessionAccount?.address} --unlocked`)} title="Copy Address" className="text-gray-500 hover:text-white">
                     <Copy size={14} />
