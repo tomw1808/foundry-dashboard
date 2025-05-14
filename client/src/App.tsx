@@ -1067,7 +1067,7 @@ function App() {
         />
 
         <TrackedTransactionsList
-          trackedTxs={trackedTxs}
+          trackedTxs={_trackedTxs}
           getExplorerLink={getExplorerLink}
           copyToClipboard={copyToClipboard}
         />
