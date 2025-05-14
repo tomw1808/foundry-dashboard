@@ -76,6 +76,7 @@ function App() {
   const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
   const [_eip7702SessionAccount, _setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
   const eip7702SessionAccountRef = useRef(_eip7702SessionAccount); // Ref for up-to-date access in closures
+  const [signingRequestId, setSigningRequestId] = useState<string | null>(null); // Tracks the ID of the request being signed
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -547,6 +548,7 @@ function App() {
     const currentWs = wsRef.current;
 
     console.log(`Attempting to sign request ${requestId} for method ${payload.method}, Mode: ${activeMode}`);
+    setSigningRequestId(requestId); // Indicate signing has started for this request
 
     // Basic checks needed regardless of mode
     if (!currentWs || currentWs.readyState !== WebSocket.OPEN || !chainId || !publicClient) {
@@ -909,6 +911,8 @@ function App() {
       const errorCode = err.code === 4001 ? 4001 : -32000;
       const errorMessage = err.shortMessage || err.message || 'User rejected or transaction failed';
       sendSignResponse(currentWs, requestId, { error: { code: errorCode, message: errorMessage } });
+    } finally {
+      setSigningRequestId(null); // Indicate signing has finished for this request
     }
   };
 
@@ -1068,6 +1072,7 @@ function App() {
         {/* PendingActionsList and TrackedTransactionsList are now general */}
         <PendingActionsList
           pendingSignRequests={pendingSignRequests}
+          signingRequestId={signingRequestId} // Pass down the signing request ID
           handleSignTransaction={handleSignTransaction}
           handleRejectTransaction={handleRejectTransaction}
           walletClient={walletClient}

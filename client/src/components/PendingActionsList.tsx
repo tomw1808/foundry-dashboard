@@ -3,6 +3,7 @@ import { WalletClient } from 'viem';
 
 interface PendingActionsListProps {
     pendingSignRequests: SignRequest[];
+    signingRequestId: string | null; // ID of the request currently being signed
     handleSignTransaction: (request: SignRequest) => Promise<void>;
     handleRejectTransaction: (requestId: string) => void;
     walletClient: WalletClient | null | undefined;
@@ -11,6 +12,7 @@ interface PendingActionsListProps {
 
 export function PendingActionsList({
     pendingSignRequests,
+    signingRequestId, // New prop
     handleSignTransaction,
     handleRejectTransaction,
     walletClient,
@@ -90,14 +92,15 @@ export function PendingActionsList({
                     <div className="flex space-x-4">
                         <button
                             onClick={() => handleSignTransaction(request)}
-                            disabled={!walletClient || !isConnected}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!walletClient || !isConnected || signingRequestId === request.requestId}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
-                            Approve in Wallet
+                            {signingRequestId === request.requestId ? 'Processing...' : 'Approve in Wallet'}
                         </button>
                         <button
                             onClick={() => handleRejectTransaction(request.requestId)}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-semibold"
+                            disabled={signingRequestId === request.requestId}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             Reject
                         </button>
