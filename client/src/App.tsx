@@ -74,7 +74,8 @@ function App() {
 
   const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>('browser'); // New mode state
   const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
-  const [eip7702SessionAccount, setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
+  const [_eip7702SessionAccount, _setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
+  const eip7702SessionAccountRef = useRef(_eip7702SessionAccount); // Ref for up-to-date access in closures
 
   // --- WebSocket Connection ---
   useEffect(() => {
@@ -151,15 +152,18 @@ function App() {
     if (eip7702PrivateKey) {
       try {
         const account = privateKeyToAccount(eip7702PrivateKey);
-        setEip7702SessionAccount(account);
+        _setEip7702SessionAccount(account);
+        eip7702SessionAccountRef.current = account;
         console.log("Derived EIP-7702 session account:", account.address);
       } catch (error) {
         console.error("Failed to derive account from private key:", error);
-        setEip7702SessionAccount(null);
+        _setEip7702SessionAccount(null);
+        eip7702SessionAccountRef.current = null;
         // Optionally provide user feedback about invalid key in the Eip7702ModeDisplay component
       }
     } else {
-      setEip7702SessionAccount(null);
+      _setEip7702SessionAccount(null);
+      eip7702SessionAccountRef.current = null;
     }
   }, [eip7702PrivateKey]); // Run when private key changes
 
@@ -386,19 +390,21 @@ function App() {
               const originalReceipt = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
               if (originalReceipt) {
                 let deployedContractAddress: Address | null = null;
-                // The eip7702SessionAccount is the EOA that authorizes and, in this specific setup,
-                // is stated to be the emitter of the ContractCreated event.
-                const expectedEmitterAddress = eip7702SessionAccount?.address;
+                // The eip7702SessionAccountRef.current is the EOA that authorizes and, in this specific setup,
+                // is stated to be the emitter of the ContractCreated event. Access via ref.
+                const expectedEmitterAddress = eip7702SessionAccountRef.current?.address;
+
+                console.log(`[${requestId}] eth_getTransactionReceipt EIP-7702: expectedEmitterAddress = ${expectedEmitterAddress}`);
 
                 for (const log of originalReceipt.logs) {
-                  console.log("checking log", {log});
-                  console.log("log address is equal", (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase()));
-                  console.log("topic is equal", log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC);
+                  // console.log("checking log", {log}); // Keep for debugging if needed
+                  // console.log("log address is equal", (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase()));
+                  // console.log("topic is equal", log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC);
                   // Check if the log is from the expected emitter and matches the event topic
                   if (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase() &&
                       log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
 
-                        console.log(`Found the topic`, {log})
+                        console.log(`[${requestId}] Found ContractCreated event log from expected emitter ${expectedEmitterAddress}`, {log})
                     
                     // The contract address is in the data field. Data is 0x + 64 hex chars (32 bytes).
                     // The address is the last 20 bytes (40 hex chars).
@@ -566,8 +572,8 @@ function App() {
         return;
       }
     } else if (activeMode === 'eip7702') {
-      // EIP-7702 mode requires a session account and configured URLs (for Sepolia)
-      if (!eip7702SessionAccount) {
+      // EIP-7702 mode requires a session account (use ref for current value) and configured URLs (for Sepolia)
+      if (!eip7702SessionAccountRef.current) {
         const reason = 'EIP-7702 session account not available. Generate or set a private key.';
         console.error(`${reason}, cannot sign transaction in EIP-7702 mode for ${requestId}`);
         sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
@@ -595,14 +601,15 @@ function App() {
 
     try {
       let result: any;
+      const currentEip7702SessionAccount = eip7702SessionAccountRef.current; // Get current value from ref
 
-      if (activeMode === 'eip7702' && chainId === 11155111 && eip7702SessionAccount) { // Check mode and session account
+      if (activeMode === 'eip7702' && chainId === 11155111 && currentEip7702SessionAccount) { // Check mode and session account from ref
         // --- EIP-7702 Flow (using Session Private Key) ---
-        console.log(`[${requestId}] Starting EIP-7702 flow using session account ${eip7702SessionAccount.address}...`);
+        console.log(`[${requestId}] Starting EIP-7702 flow using session account ${currentEip7702SessionAccount.address}...`);
 
         // Create a local WalletClient for the session account
         const localWalletClient = createWalletClient({
-          account: eip7702SessionAccount,
+          account: currentEip7702SessionAccount,
           chain: publicClient.chain, // Use the chain object from the public client
           transport: http(rpcUrlForSessionClient)
         });
@@ -619,7 +626,7 @@ function App() {
 
         // Instantiate Simple7702Account using the SESSION account address
         const smartAccount = new Simple7702Account(
-          eip7702SessionAccount.address, // Use session account address
+          currentEip7702SessionAccount.address, // Use session account address from ref
           { entrypointAddress: CANDIDE_ENTRY_POINT_ADDRESS }
         );
 
@@ -648,7 +655,7 @@ function App() {
             });
 
             metaTx = {
-                to: eip7702SessionAccount.address, // Target the Simple7702Account itself
+                to: currentEip7702SessionAccount.address, // Target the Simple7702Account itself (using address from ref)
                 value: sanitizedTx.value || 0n,    // Pass through any value sent with the deployment
                 data: callDataForCreateContract,
             };
@@ -667,12 +674,12 @@ function App() {
 
         // Prepare & Sign EIP-7702 Authorization using the LOCAL wallet client
         // Nonce is for the SESSION account
-        const sessionAccountNonceForAuth = await publicClient.getTransactionCount({ address: eip7702SessionAccount.address, blockTag: 'pending' });
+        const sessionAccountNonceForAuth = await publicClient.getTransactionCount({ address: currentEip7702SessionAccount.address, blockTag: 'pending' });
         const designatedContractAddress = SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS;
 
-        console.debug(`Signing EIP-7702 Auth: SessionAccount=${eip7702SessionAccount.address}, DesignatedContract=${designatedContractAddress}, SessionAccountAuthNonce=${sessionAccountNonceForAuth}`);
+        console.debug(`Signing EIP-7702 Auth: SessionAccount=${currentEip7702SessionAccount.address}, DesignatedContract=${designatedContractAddress}, SessionAccountAuthNonce=${sessionAccountNonceForAuth}`);
         const eip7702FullSignature = await localWalletClient.signAuthorization({
-          account: eip7702SessionAccount, // Sign with the session account
+          account: currentEip7702SessionAccount, // Sign with the session account from ref
           contractAddress: designatedContractAddress,
           nonce: sessionAccountNonceForAuth,
           chainId: chainId,
@@ -806,7 +813,7 @@ function App() {
             return prevMap; // Should ideally always find the existingTx
         });
 
-      } else { // This 'else' corresponds to: if NOT (activeMode === 'eip7702' && chainId === 11155111 && eip7702SessionAccount)
+      } else { // This 'else' corresponds to: if NOT (activeMode === 'eip7702' && chainId === 11155111 && currentEip7702SessionAccount)
         // --- Standard Flow (Browser Wallet or other conditions not met for EIP-7702) ---
         if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
           const rawTx = payload.params[0] as any;
@@ -1018,7 +1025,7 @@ function App() {
           <TabsContent value="eip7702">
             <Eip7702ModeDisplay
               privateKey={eip7702PrivateKey}
-              sessionAccount={eip7702SessionAccount}
+              sessionAccount={_eip7702SessionAccount} 
               setPrivateKey={setEip7702PrivateKey}
               rpcUrl={rpcUrlForLocalClient} // This prop might not be actively used by Eip7702ModeDisplay currently
               chainId={chainId} // This prop might not be actively used by Eip7702ModeDisplay currently
@@ -1042,7 +1049,7 @@ function App() {
                   </blockquote></code>
                 </div>
                 <p>
-                  Call the Foundry-Script with `forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {eip7702SessionAccount?.address} --unlocked`  <button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${eip7702SessionAccount?.address} --unlocked`)} title="Copy Address" className="text-gray-500 hover:text-white">
+                  Call the Foundry-Script with `forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {eip7702SessionAccountRef.current?.address} --unlocked`  <button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${eip7702SessionAccountRef.current?.address} --unlocked`)} title="Copy Address" className="text-gray-500 hover:text-white">
                     <Copy size={14} />
                   </button>
                 </p>
