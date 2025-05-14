@@ -55,7 +55,7 @@ export function DashboardHeader({ wsStatus, processedRequests }: DashboardHeader
                 </TooltipProvider>
             </div>
             <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-400">
+                <div className="text-xs text-gray-400">
                     Requests: <span className="font-semibold text-gray-200">{processedRequests}</span>
                 </div>
                 <ConnectButton accountStatus="address" chainStatus="icon" showBalance={false} />

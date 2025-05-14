@@ -1039,8 +1039,8 @@ function App() {
       <main className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mt-0"> {/* Adjusted margin if needed */}
         <Tabs value={activeMode} onValueChange={(value) => setActiveMode(value as any)} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="browser">Browser Wallet</TabsTrigger>
-            <TabsTrigger value="eip7702" disabled={!isConnected || chainId !== 11155111}>
+            <TabsTrigger value="browser" className='hover:cursor-pointer'>Browser Wallet</TabsTrigger>
+            <TabsTrigger value="eip7702"  className='hover:cursor-pointer' disabled={!isConnected || chainId !== 11155111}>
               EIP-7702 Sponsored
               {(!isConnected || chainId !== 11155111) && <span className="text-xs text-yellow-500 ml-1">(Sepolia Only)</span>}
             </TabsTrigger>
@@ -1059,7 +1059,7 @@ function App() {
                   <div className='flex flex-col'>
                     <div className="flex items-center space-x-2">
                       <span className="font-mono text-sm text-gray-300 truncate" title={address}>{address}</span>
-                      <Button variant="ghost" size="icon" onClick={() => copyToClipboard(address)} title="Copy Address">
+                      <Button variant="ghost" className='hover:cursor-pointer' size="icon" onClick={() => copyToClipboard(address)} title="Copy Address">
                         <Copy size={16} />
                       </Button>
                     </div>
@@ -1069,7 +1069,7 @@ function App() {
 
                       <span className='font-mono pl-2'>
                         forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {address} --unlocked
-                      </span> <Button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${address} --unlocked`)} title="Copy command" variant="ghost" size="icon" >
+                      </span> <Button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${address} --unlocked`)} title="Copy command" variant="ghost" size="icon" className='hover:cursor-pointer' >
                         <Copy size={16} />
                       </Button>
 
@@ -1091,16 +1091,7 @@ function App() {
               rpcUrl={rpcUrlForLocalClient} 
               chainId={chainId} 
             />
-            <Alert className="mt-6 border-blue-500 bg-blue-900/30 text-blue-200">
-              <Terminal className="h-4 w-4 !text-blue-400" />
-              <AlertTitle className="text-blue-300">Tip: Deterministic Deployments with Factories</AlertTitle>
-              <AlertDescription className="text-sm text-blue-300/90 space-y-2">
-               
-                <p> 
-                  {/* The forge script command for EIP-7702 mode is now displayed within Eip7702ModeDisplay component */}
-                </p>
-              </AlertDescription>
-            </Alert>
+           
           </TabsContent>
 
           {/* Content for ERC-4337 Mode */}

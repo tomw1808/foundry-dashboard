@@ -79,7 +79,7 @@ export function Eip7702ModeDisplay({
                             <span className="font-mono text-sm text-purple-300 truncate" title={sessionAccount.address}>
                                 {sessionAccount.address}
                             </span>
-                            <Button variant="ghost" size="icon" onClick={() => copyToClipboard(sessionAccount.address)} title="Copy EIP-7702 Address">
+                            <Button variant="ghost" size="icon" onClick={() => copyToClipboard(sessionAccount.address)} title="Copy EIP-7702 Address" className='hover:cursor-pointer'>
                                 <Copy size={16} />
                             </Button>
                         </div>
@@ -88,7 +88,7 @@ export function Eip7702ModeDisplay({
                             <span className='font-mono pl-2'>
                                 {forgeCommand}
                             </span>
-                            <Button onClick={() => copyToClipboard(forgeCommand)} title="Copy command" variant="ghost" size="icon" >
+                            <Button onClick={() => copyToClipboard(forgeCommand)} title="Copy command" variant="ghost" size="icon" className='hover:cursor-pointer' >
                                 <Copy size={16} />
                             </Button>
                         </div>
