@@ -543,8 +543,9 @@ function App() {
       if (!walletClient || !address) {
         const reason = !walletClient ? 'Browser wallet client not available' : 'Browser wallet address not available';
         console.error(`${reason}, cannot sign transaction in Browser Wallet mode for ${requestId}`);
-        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+        sendSignResponse(requestId, { error: { code: -32000, message: reason } });
         setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        setSigningRequestId(null); // Clear signing ID
         return;
       }
     } else if (activeMode === 'eip7702') {
@@ -552,15 +553,17 @@ function App() {
       if (!eip7702SessionAccountRef.current) {
         const reason = 'EIP-7702 session account not available. Generate or set a private key.';
         console.error(`${reason}, cannot sign transaction in EIP-7702 mode for ${requestId}`);
-        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+        sendSignResponse(requestId, { error: { code: -32000, message: reason } });
         setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        setSigningRequestId(null); // Clear signing ID
         return;
       }
       if (chainId === 11155111 && !areCandideUrlsConfigured) {
         const configErrorMessage = "EIP-7702 Bundler/Paymaster URLs not configured in .env file. Please set VITE_CANDIDE_SEPOLIA_BUNDLER_URL and VITE_CANDIDE_SEPOLIA_PAYMASTER_URL.";
         console.error(`[${requestId}] ${configErrorMessage}`);
-        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
+        sendSignResponse(requestId, { error: { code: -32000, message: "EIP-7702 provider URLs not configured." } });
         setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        setSigningRequestId(null); // Clear signing ID
         // Do not disable the mode here, just prevent the transaction
         return;
       }
@@ -593,8 +596,9 @@ function App() {
 
 
         if (payload.method !== 'eth_sendTransaction' || !payload.params?.[0]) {
-          sendSignResponse(currentWs, requestId, { error: { code: -32602, message: "EIP-7702 flow currently only supports eth_sendTransaction." } });
+          sendSignResponse(requestId, { error: { code: -32602, message: "EIP-7702 flow currently only supports eth_sendTransaction." } });
           setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+          setSigningRequestId(null); // Clear signing ID
           throw new Error("EIP-7702 flow currently only supports eth_sendTransaction.");
         }
         const rawTx = payload.params[0] as any;
