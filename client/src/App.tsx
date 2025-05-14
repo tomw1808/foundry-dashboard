@@ -761,28 +761,47 @@ function App() {
             return prevMap; // Should ideally always find the existingTx
         });
 
-      } else {
-        // --- Standard Flow (Non-EIP-7702 or conditions not met) ---
+      } else { // This 'else' corresponds to: if NOT (activeMode === 'eip7702' && chainId === 11155111 && eip7702SessionAccount)
+        // --- Standard Flow (Browser Wallet or other conditions not met for EIP-7702) ---
         if (payload.method === 'eth_sendTransaction' && payload.params?.[0]) {
           const rawTx = payload.params[0] as any;
-          const sanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
+          // Sanitize the transaction initially.
+          const baseSanitizedTx = sanitizeTransactionRequest(rawTx, requestId);
 
-          console.log(`[${requestId}] Sanitized transaction object for standard flow:`, JSON.stringify(sanitizedTx, (_key, value) =>
+          let finalTxToSend = { ...baseSanitizedTx }; // Clone for potential modification
+
+          if (activeMode === 'browser') {
+            // For browser wallet mode, delegate nonce management to the wallet.
+            // This can be more reliable as the wallet (e.g., MetaMask) has the most current view of its own nonce sequence,
+            // especially if transactions are also initiated directly from the wallet UI.
+            // Foundry provides a nonce from eth_getTransactionCount("pending"), but by removing it here,
+            // we let the wallet use its internally determined next nonce.
+            if (finalTxToSend.nonce !== undefined) {
+              console.log(`[${requestId}] Browser mode: Removing nonce (${finalTxToSend.nonce}) from transaction. Wallet will assign nonce.`);
+              delete finalTxToSend.nonce;
+            } else {
+              console.log(`[${requestId}] Browser mode: Nonce was not present in rawTx from Foundry. Wallet will assign nonce.`);
+            }
+          }
+          // For other modes (e.g., if a future 'direct_private_key' mode was added here, or if EIP-7702 logic was moved here),
+          // finalTxToSend would still contain the nonce if `activeMode !== 'browser'`.
+
+          console.log(`[${requestId}] Final transaction object for ${activeMode} flow (method ${payload.method}):`, JSON.stringify(finalTxToSend, (_key, value) =>
             typeof value === 'bigint' ? value.toString() : value
             , 2));
 
           console.log(`[${requestId}] Calling walletClient.sendTransaction...`);
-          result = await walletClient?.sendTransaction(sanitizedTx);
+          // Ensure walletClient is available (already checked for browser mode, but good practice if this block structure changes)
+          if (!walletClient) {
+            throw new Error("Wallet client is not available for sending the transaction.");
+          }
+          result = await walletClient.sendTransaction(finalTxToSend); // Use the (potentially) modified transaction
           console.log(`[${requestId}] Transaction sent via walletClient, hash: ${result}`);
         } else {
-          // Handle other signing methods (eth_sign, personal_sign, etc.) here if needed
-          // Example:
-          // if (payload.method === 'personal_sign' && payload.params?.[0] && payload.params?.[1]) {
-          //   const message = payload.params[0];
-          //   const account = payload.params[1] as Address;
-          //   result = await walletClient.signMessage({ account, message });
-          // } else { ... }
-          throw new Error(`Unsupported signing method: ${payload.method}`);
+          // Handle other signing methods (eth_sign, personal_sign, etc.)
+          // These typically don't involve nonces in the same way eth_sendTransaction does.
+          console.error(`[${requestId}] Unsupported signing method in standard/browser flow: ${payload.method}`);
+          throw new Error(`Unsupported signing method in standard/browser flow: ${payload.method}`);
         }
       }
 
