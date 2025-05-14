@@ -121,6 +121,9 @@ function App() {
   const eip7702SessionAccountRef = useRef(_eip7702SessionAccount); // Ref for up-to-date access in closures
   const [signingRequestId, setSigningRequestId] = useState<string | null>(null); // Tracks the ID of the request being signed
 
+  // Ref to track if the EIP-7702 private key state has been initialized
+  const hasInitializedPrivateKeyState = useRef(false);
+
   // State for persisting EIP-7702 private key in local storage
   const [persistKeyInLocalStorage, setPersistKeyInLocalStorage] = useState<boolean>(() => {
     const storedPreference = localStorage.getItem('foundryDashboard_eip7702_persistPreference');
@@ -147,26 +150,37 @@ function App() {
       }
     }
 
-    if (!loadedKey && activeMode === 'eip7702' && !eip7702PrivateKey) {
-      console.log("Generating initial EIP-7702 session private key (not found in local storage or persistence off)...");
-      const newPrivateKey = generatePrivateKey();
-      setEip7702PrivateKey(newPrivateKey);
-      // If persistence is on, this new key will be saved by the effect below
+    if (!loadedKey && activeMode === 'eip7702') {
+      // Only generate if eip7702PrivateKey is still null after attempting to load.
+      if (!eip7702PrivateKey) {
+        console.log("Generating EIP-7702 session private key (not loaded and not in state)...");
+        const newPrivateKey = generatePrivateKey();
+        setEip7702PrivateKey(newPrivateKey);
+      }
     }
-  }, [activeMode, persistKeyInLocalStorage]); // Rerun if mode changes or persistence preference changes
+    // Mark that the private key state has been through its initial load/generate cycle.
+    hasInitializedPrivateKeyState.current = true;
+  }, [activeMode, persistKeyInLocalStorage, eip7702PrivateKey]); // Added eip7702PrivateKey to deps
 
   // --- Effect to Save/Remove EIP-7702 Private Key based on Persistence ---
   useEffect(() => {
+    // Wait until the private key state has been initialized before acting on local storage.
+    if (!hasInitializedPrivateKeyState.current) {
+      return;
+    }
+
     if (persistKeyInLocalStorage) {
       if (eip7702PrivateKey) {
         localStorage.setItem('foundryDashboard_eip7702_privateKey', eip7702PrivateKey);
         console.log("Saved EIP-7702 private key to local storage.");
       } else {
-        // If key becomes null while persistence is on, remove it (e.g. user clears it manually)
+        // Persist is ON, key is NULL, and initialization HAS happened.
+        // This implies the key was explicitly cleared after initial setup.
         localStorage.removeItem('foundryDashboard_eip7702_privateKey');
+        console.log("Cleared EIP-7702 private key from local storage (key set to null while persist is on).");
       }
     } else {
-      // If persistence is turned off, remove any stored key
+      // Persistence is OFF. Remove any key from local storage.
       localStorage.removeItem('foundryDashboard_eip7702_privateKey');
       console.log("Removed EIP-7702 private key from local storage (persistence disabled).");
     }
