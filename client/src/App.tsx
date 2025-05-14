@@ -26,16 +26,11 @@ import { useWebSocketManager } from '@/hooks/useWebSocketManager'; // Import the
 // Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
 const CANDIDE_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com"; // Public RPC, can remain hardcoded or also be env var
 
-// Bundler and Paymaster URLs from Vite environment variables (see .env.example)
-// Fallback to placeholder strings for guidance if not set.
-const VITE_CANDIDE_SEPOLIA_BUNDLER_URL = import.meta.env.VITE_CANDIDE_SEPOLIA_BUNDLER_URL;
-const VITE_CANDIDE_SEPOLIA_PAYMASTER_URL = import.meta.env.VITE_CANDIDE_SEPOLIA_PAYMASTER_URL;
-
 const BUNDLER_URL_PLACEHOLDER = "https://api.candide.dev/bundler/v3/sepolia/5bfc7f3150f9c9834d6b024261680726"; //bundled on purpose together to github, public endpoint
 const PAYMASTER_URL_PLACEHOLDER = "https://api.candide.dev/paymaster/v3/sepolia/5bfc7f3150f9c9834d6b024261680726"; //bundles on purpose together and pushed to github, public endpoint
 
-const ACTUAL_BUNDLER_URL = VITE_CANDIDE_SEPOLIA_BUNDLER_URL || BUNDLER_URL_PLACEHOLDER;
-const ACTUAL_PAYMASTER_URL = VITE_CANDIDE_SEPOLIA_PAYMASTER_URL || PAYMASTER_URL_PLACEHOLDER;
+const ACTUAL_BUNDLER_URL = BUNDLER_URL_PLACEHOLDER;
+const ACTUAL_PAYMASTER_URL = PAYMASTER_URL_PLACEHOLDER;
 
 const areCandideUrlsConfigured =
   ACTUAL_BUNDLER_URL !== BUNDLER_URL_PLACEHOLDER &&
