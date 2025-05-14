@@ -985,7 +985,7 @@ function App() {
                 Standard mode: Transactions are signed and sent directly by your connected browser wallet.
               </p>
               <div className="flex flex-col items-left gap-4 justify-between space-x-4 p-3 bg-gray-700/50 rounded-md">
-                <ConnectButton />
+                {/* ConnectButton moved to DashboardHeader */}
                 {isConnected && address && (
                   <div className='flex flex-col'>
                     <div className="flex items-center space-x-2">

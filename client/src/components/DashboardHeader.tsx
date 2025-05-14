@@ -1,5 +1,6 @@
 import { Network } from 'lucide-react';
 import { WsStatus } from '@/types';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import {
     Tooltip,
     TooltipContent,
@@ -40,16 +41,20 @@ export function DashboardHeader({ wsStatus }: DashboardHeaderProps) {
     return (
         <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700 mb-6">
             <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Network className={`h-5 w-5 ${statusColor}`} />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{statusTooltip}</p>
-                    </TooltipContent>
+            <div className="flex items-center space-x-4">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Network className={`h-5 w-5 ${statusColor}`} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{statusTooltip}</p>
+                        </TooltipContent>
+                    </Tooltip>
                 </Tooltip>
             </TooltipProvider>
+            <ConnectButton />
+            </div>
         </header>
     );
 }
