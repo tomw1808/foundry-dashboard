@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/tomw1808/foundry-dashboard/compare/v1.2.0...v2.0.0) (2025-05-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* empty commit with new version number for breaking change
+
+### Features
+
+* empty commit with new version number for breaking change ([f34463e](https://github.com/tomw1808/foundry-dashboard/commit/f34463e550299b327fcf75896079eb1aff195ffd))
+
 ## [1.2.0](https://github.com/tomw1808/foundry-dashboard/compare/v1.1.5...v1.2.0) (2025-05-14)
 
 
