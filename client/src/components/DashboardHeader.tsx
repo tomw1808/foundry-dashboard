@@ -51,9 +51,8 @@ export function DashboardHeader({ wsStatus }: DashboardHeaderProps) {
                             <p>{statusTooltip}</p>
                         </TooltipContent>
                     </Tooltip>
-                </Tooltip>
             </TooltipProvider>
-            <ConnectButton />
+            <ConnectButton accountStatus="address" chainStatus="icon" showBalance={false} />
             </div>
         </header>
     );
