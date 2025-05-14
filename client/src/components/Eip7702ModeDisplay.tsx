@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch'; // Import Switch
-import { AlertCircle, Eye, EyeOff, Copy, RefreshCw } from 'lucide-react'; // Import AlertCircle
+import { AlertCircle, Eye, EyeOff, Copy, RefreshCw, Settings } from 'lucide-react'; // Import AlertCircle
 import {
     Accordion,
     AccordionContent,
@@ -69,7 +69,7 @@ export function Eip7702ModeDisplay({
         <div className="space-y-4">
             <p className="text-sm text-gray-400">
                 EIP-7702 mode: Transactions are authorized by a temporary session key and sent via a Bundler/Paymaster.
-                Currently configured for Sepolia via <a href="https://Candide.dev" target='_blank' rel="noopener noreferrer" className="underline hover:text-blue-100">Candide.dev</a>.
+                Currently configured for Sepolia via <a href="https://Candide.dev" target='_blank' rel="noopener noreferrer" className="underline hover:text-blue-100">Candide.dev</a>. You do not need any ETH in your account, simply run the forge script command with the current RPC and it will be paid for. Works for contract creation and transactions.
             </p>
 
             {sessionAccount ? (
@@ -102,8 +102,8 @@ export function Eip7702ModeDisplay({
 
             <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="eip7702-settings" className="border-gray-700">
-                    <AccordionTrigger className="text-base hover:no-underline text-gray-300 data-[state=open]:text-purple-300">
-                        EIP-7702 Session Key Settings
+                    <AccordionTrigger className="text-base bg-gray-900 p-2 hover:no-underline hover:cursor-pointer text-gray-300 data-[state=open]:text-purple-300">
+                    <span className='flex gap-2'><Settings /> EIP-7702 Session Key Settings</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <div className="space-y-4 p-4 border border-purple-600 rounded bg-gray-800 shadow-md">
@@ -127,7 +127,7 @@ export function Eip7702ModeDisplay({
                             )}
 
                             <div className="flex items-end space-x-2 mb-4">
-                                <Button onClick={handleRegenerate} variant="outline" size="sm" className="text-purple-300 border-purple-500 hover:bg-purple-900">
+                                <Button onClick={handleRegenerate} variant="outline" size="sm" className="text-purple-800 border-purple-500 hover:bg-purple-900 hover:text-purple-100 hover:cursor-pointer">
                                     <RefreshCw size={14} className="mr-1" /> Regenerate
                                 </Button>
                             </div>
