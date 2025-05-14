@@ -54,7 +54,7 @@ export function Eip7702ModeDisplay({
         <div className="mt-6 p-4 border border-purple-600 rounded bg-gray-800 shadow-md">
             <h3 className="text-lg font-semibold mb-3 text-purple-300">EIP-7702 Session Account</h3>
             <p className="text-sm text-gray-400 mb-4">
-                This temporary account signs EIP-7702 authorizations. Your connected browser wallet ({'"'}Browser Wallet{'"'} mode) still sends the final transaction and pays gas.
+                This temporary account signs EIP-7702 authorizations. Transactions on Sepolia are routed through <a href="https://Candide.dev" target='_blank' rel="noopener noreferrer" className="underline hover:text-blue-100">Candide.dev</a> Paymaster/Bundler Architecture.
             </p>
 
             {sessionAccount ? (
