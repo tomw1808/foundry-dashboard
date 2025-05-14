@@ -14,9 +14,8 @@ import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
 // import { Switch } from '@/components/ui/switch'; // No longer needed
 // import { Label } from '@/components/ui/label';   // No longer needed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // For new UI
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // For helper text
 import { Button } from '@/components/ui/button'; // For copy button
-import { Copy, Terminal } from 'lucide-react'; // For icons
+import { Copy } from 'lucide-react'; // For icons
 
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
