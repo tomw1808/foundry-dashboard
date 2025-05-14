@@ -47,7 +47,7 @@ export function TrackedTransactionsList({
                                         <div className="flex items-center space-x-2 mb-1">
                                             <span className="text-gray-400 w-24 flex-shrink-0">UserOp Hash:</span>
                                             <span className="font-mono text-xs truncate">{tx.hash}</span>
-                                            <button onClick={() => copyToClipboard(tx.hash)} title="Copy UserOp Hash" className="text-gray-500 hover:text-white">
+                                            <button onClick={() => copyToClipboard(tx.hash)} title="Copy UserOp Hash" className="text-gray-500 hover:text-white hover:cursor-pointer">
                                                 <Copy size={14} />
                                             </button>
                                             {/* Link for UserOp hash if a specific explorer for UserOps is ever used */}
@@ -60,7 +60,7 @@ export function TrackedTransactionsList({
                                             {tx.actualTxHash && tx.hash !== tx.actualTxHash ? "Tx Hash:" : "Hash:"}
                                         </span>
                                         <span className="font-mono text-xs truncate">{primaryHash}</span>
-                                        <button onClick={() => copyToClipboard(primaryHash)} title={tx.actualTxHash && tx.hash !== tx.actualTxHash ? "Copy Transaction Hash" : "Copy Hash"} className="text-gray-500 hover:text-white">
+                                        <button onClick={() => copyToClipboard(primaryHash)} title={tx.actualTxHash && tx.hash !== tx.actualTxHash ? "Copy Transaction Hash" : "Copy Hash"} className="text-gray-500 hover:text-white hover:cursor-pointer">
                                             <Copy size={14} />
                                         </button>
                                         {primaryExplorerLink && (
@@ -74,7 +74,7 @@ export function TrackedTransactionsList({
                                         <div className="flex items-center space-x-2">
                                             <span className="text-gray-400 w-24 flex-shrink-0">Contract Addr:</span>
                                             <span className="font-mono text-xs truncate">{tx.contractAddress}</span>
-                                            <button onClick={() => copyToClipboard(tx.contractAddress)} title="Copy Address" className="text-gray-500 hover:text-white">
+                                            <button onClick={() => copyToClipboard(tx.contractAddress)} title="Copy Address" className="text-gray-500 hover:text-white hover:cursor-pointer">
                                                 <Copy size={14} />
                                             </button>
                                             {contractExplorerLink && (

@@ -114,11 +114,11 @@ export function Eip7702ModeDisplay({
                                         <span className={`font-mono text-sm break-all ${showPrivateKey ? 'text-purple-200' : 'text-gray-500'}`}>
                                             {showPrivateKey ? privateKey : '******************************************************************'}
                                         </span>
-                                        <button onClick={() => setShowPrivateKey(!showPrivateKey)} title={showPrivateKey ? "Hide Key" : "Show Key"} className="text-gray-500 hover:text-white ml-2 flex-shrink-0">
+                                        <button onClick={() => setShowPrivateKey(!showPrivateKey)} title={showPrivateKey ? "Hide Key" : "Show Key"} className="text-gray-500 hover:text-white hover:cursor-pointer ml-2 flex-shrink-0">
                                             {showPrivateKey ? <EyeOff size={14} /> : <Eye size={14} />}
                                         </button>
                                         {showPrivateKey && (
-                                            <button onClick={() => copyToClipboard(privateKey)} title="Copy Private Key" className="text-gray-500 hover:text-white flex-shrink-0">
+                                            <button onClick={() => copyToClipboard(privateKey)} title="Copy Private Key" className="text-gray-500 hover:text-white hover:cursor-pointer flex-shrink-0">
                                                 <Copy size={14} />
                                             </button>
                                         )}
