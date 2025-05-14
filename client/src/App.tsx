@@ -110,7 +110,12 @@ function App() {
   // Use _trackedTxs for useEffect dependencies if needed for re-running effects based on state change.
   // Use trackedTxsRef.current for accessing the latest value within closures like handleRpcRequest.
 
-  const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>('browser'); // New mode state
+  const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>(() => {
+    const storedMode = localStorage.getItem('foundryDashboard_activeMode') as 'browser' | 'eip7702' | 'erc4337' | null;
+    // Initial check for EIP-7702 availability will be done in an effect after connection status is known.
+    // For now, just load it or default to browser.
+    return storedMode || 'browser';
+  });
   const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
   const [_eip7702SessionAccount, _setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
   const eip7702SessionAccountRef = useRef(_eip7702SessionAccount); // Ref for up-to-date access in closures
@@ -171,6 +176,18 @@ function App() {
   useEffect(() => {
     localStorage.setItem('foundryDashboard_eip7702_persistPreference', persistKeyInLocalStorage.toString());
   }, [persistKeyInLocalStorage]);
+
+  // --- Effect to Save Active Mode Preference & Validate on Load/Connection Change ---
+  useEffect(() => {
+    // Save current mode to local storage
+    localStorage.setItem('foundryDashboard_activeMode', activeMode);
+
+    // Validate if EIP-7702 mode can remain active
+    if (activeMode === 'eip7702' && (!isConnected || chainId !== 11155111)) {
+      console.log("EIP-7702 mode was selected but conditions (connected to Sepolia) are not met. Reverting to browser mode.");
+      setActiveMode('browser'); // Fallback to browser mode
+    }
+  }, [activeMode, isConnected, chainId]);
 
 
   // --- Derive EIP-7702 Session Account Effect ---
