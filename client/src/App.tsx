@@ -2,7 +2,7 @@ import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } fro
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useCallback
 import { Address, BlockTag, Hex, serializeSignature, toHex } from 'viem';
 
-// Import types and components
+// Import types and components 
 import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types'; // WsStatus is used by the hook
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
