@@ -398,9 +398,7 @@ function App() {
                 console.log(`[${requestId}] eth_getTransactionReceipt EIP-7702: expectedEmitterAddress = ${expectedEmitterAddress}`);
 
                 for (const log of originalReceipt.logs) {
-                  // console.log("checking log", {log}); // Keep for debugging if needed
-                  // console.log("log address is equal", (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase()));
-                  // console.log("topic is equal", log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC);
+                  
                   // Check if the log is from the expected emitter and matches the event topic
                   if (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase() &&
                       log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
