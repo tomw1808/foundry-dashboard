@@ -192,6 +192,7 @@ function App() {
           const receipt = await publicClient.getTransactionReceipt({ hash });
 
           if (receipt) {
+            // Successfully found: update status to 'success' or 'reverted'
             console.debug(`Receipt found for ${hash}: Status ${receipt.status}`);
             setTrackedTxs(prevMap => {
               const currentTx = prevMap.get(hash);
@@ -203,23 +204,44 @@ function App() {
                 contractAddress: receipt.contractAddress,
               });
             });
-            // Stop polling for this one once receipt is found
+            // Polling for this hash will stop due to status change
           } else {
-            // Still pending, reset status from 'checking' back to 'pending'
+            // Not found, but no error thrown (RPC returned null for a pending tx)
+            // This is an expected scenario for a pending transaction.
+            console.trace(`[Polling] Receipt for ${hash} is null (still pending). Will retry.`);
             setTrackedTxs(prevMap => {
               const currentTx = prevMap.get(hash);
-              if (!currentTx || currentTx.status !== 'checking') return prevMap;
-              return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+              // Reset to 'pending' only if it was 'checking'
+              if (currentTx && currentTx.status === 'checking') {
+                return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+              }
+              return prevMap; // No change if status wasn't 'checking' or tx disappeared
             });
           }
         } catch (error: any) {
-          console.warn({ err: error, hash }, `Error fetching receipt for tx`);
-          // Reset status back to pending on error to allow retry
-          setTrackedTxs(prevMap => {
-            const currentTx = prevMap.get(hash);
-            if (!currentTx || currentTx.status !== 'checking') return prevMap;
-            return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
-          });
+          // Handle errors thrown by getTransactionReceipt
+          if (error.name === 'TransactionReceiptNotFoundError') {
+            // Specifically handle "not found" error: transaction is still pending.
+            // This is an expected error during the lifecycle of a pending transaction.
+            console.trace(`[Polling] Receipt not yet found for ${hash} (Error: ${error.message}). Will retry.`);
+            setTrackedTxs(prevMap => {
+              const currentTx = prevMap.get(hash);
+              if (currentTx && currentTx.status === 'checking') {
+                return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+              }
+              return prevMap;
+            });
+          } else {
+            // For other types of errors (network, RPC internal, etc.)
+            console.warn({ err: error, hash }, `Error fetching receipt for tx. Will retry.`);
+            setTrackedTxs(prevMap => {
+              const currentTx = prevMap.get(hash);
+              if (currentTx && currentTx.status === 'checking') {
+                return new Map(prevMap).set(hash, { ...currentTx, status: 'pending' });
+              }
+              return prevMap;
+            });
+          }
         }
       }
     }, POLLING_INTERVAL);
