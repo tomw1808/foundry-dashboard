@@ -1,9 +1,9 @@
 import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react'; // Added useCallback
 import { Address, BlockTag, Hex, serializeSignature, toHex } from 'viem';
 
 // Import types and components
-import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types';
+import { SignRequest, TrackedTxInfo, RpcPayload, WsStatus } from '@/types'; // WsStatus is used by the hook
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
 
@@ -21,6 +21,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'; // Assuming RainbowKit C
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
 import { createWalletClient, http, encodeFunctionData, getAddress } from 'viem'; // Added getAddress, encodeFunctionData & for local EIP-7702 client
+import { useWebSocketManager } from '@/hooks/useWebSocketManager'; // Import the new hook
 
 // --- Configuration Constants for Candide EIP-7702 ---
 // Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
@@ -53,10 +54,40 @@ function App() {
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId });
   const { data: walletClient } = useWalletClient();
-  const wsRef = useRef<WebSocket | null>(null);
+  // wsRef and direct wsStatus state are removed, will be managed by useWebSocketManager
   const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]);
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
   const [processedRequests, setProcessedRequests] = useState(0);
+
+  // --- Helper for BigInt serialization (defined early for use in callbacks) ---
+  const jsonReplacer = useCallback((_key: string, value: any) => {
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    return value;
+  }, []);
+
+  // --- WebSocket Message Handling Callbacks (to be passed to the hook) ---
+  const handleSignRequestReceived = useCallback((request: SignRequest) => {
+    console.log('[App.tsx] Received signRequest:', request.requestId, request.payload?.method);
+    setPendingSignRequests((prev) =>
+        prev.find((req) => req.requestId === request.requestId)
+            ? prev
+            : [...prev, request]
+    );
+  }, []); // setPendingSignRequests is stable
+
+  // Define state to hold the memoized onRpcRequest callback for the hook
+  // This helps break the circular dependency: hook needs onRpcRequest, onRpcRequest needs hook's sendMessage
+  const [onRpcRequestCallback, setOnRpcRequestCallback] = useState<(requestId: string, payload: RpcPayload) => void>(
+    () => async (requestId: string, payload: RpcPayload) => {
+      console.warn(`[App.tsx] onRpcRequest called before initialization for ${requestId}`, payload.method);
+    }
+  );
+  
+  const { wsStatus, sendMessage } = useWebSocketManager({
+    onRpcRequest: onRpcRequestCallback,
+    onSignRequestReceived: handleSignRequestReceived,
+  });
 
   // --- Tracked Transactions State with Ref for Closures ---
   const [_trackedTxs, _setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
@@ -78,65 +109,7 @@ function App() {
   const eip7702SessionAccountRef = useRef(_eip7702SessionAccount); // Ref for up-to-date access in closures
   const [signingRequestId, setSigningRequestId] = useState<string | null>(null); // Tracks the ID of the request being signed
 
-  // --- WebSocket Connection ---
-  useEffect(() => {
-    const wsUrl = `ws://${window.location.host}/socket`;
-    console.log('Attempting to connect WebSocket to:', wsUrl);
-    setWsStatus('connecting');
-    const socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => {
-      console.log('WebSocket Connected');
-      wsRef.current = socket; // Store instance in ref
-      setWsStatus('open');
-      socket.send(JSON.stringify({ type: 'clientHello', message: 'Frontend connected' }));
-    };
-
-    socket.onmessage = (event) => {
-      // Access the current WebSocket instance via wsRef.current inside the handler
-      // console.log('WebSocket Message Received:', event.data); // Reduce noise
-      try {
-        const message = JSON.parse(event.data);
-        // setMessages((prev) => [...prev, message]); // Don't store every message
-
-        // Handle incoming requests from backend
-        if (message.type === 'rpcRequest') {
-          // Log only the request type, not full payload by default
-          console.log(`Received rpcRequest for method: ${message.payload?.method} (ID: ${message.requestId})`);
-          handleRpcRequest(message.requestId, message.payload);
-        } else if (message.type === 'signRequest') {
-          console.log('Received signRequest:', message.requestId, message.payload?.method); // Log key info
-          // Add to pending requests state if not already present
-          setPendingSignRequests((prev) =>
-            prev.find((req) => req.requestId === message.requestId)
-              ? prev
-              : [...prev, { requestId: message.requestId, payload: message.payload }]
-          );
-        }
-
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
-      }
-    };
-
-    socket.onerror = (error) => {
-      console.error('WebSocket Error:', error);
-      wsRef.current = null; // Clear ref on error
-      setWsStatus('error');
-    };
-
-    socket.onclose = () => {
-      console.log('WebSocket Disconnected');
-      wsRef.current = null; // Clear ref on close
-      setWsStatus('closed');
-      // Optional: Implement reconnection logic here
-    };
-
-    // Cleanup function
-    return () => {
-      socket.close();
-    };
-  }, []); // Run only once on component mount
+  // --- WebSocket Connection logic is now in useWebSocketManager ---
 
   // --- Generate EIP-7702 Session Key Effect ---
   useEffect(() => {
@@ -295,25 +268,34 @@ function App() {
   });
 
 
-  // --- RPC Request Handling ---
-  const handleRpcRequest = async (requestId: string, payload: RpcPayload) => { // Use RpcPayload type
-    // RPC handling logic remains here
-    // --- Access the WebSocket instance via the ref ---
-    const currentWs = wsRef.current;
-    // --- ---
+  // --- RPC Response Sender (uses sendMessage from hook) ---
+  const sendRpcResponse = useCallback((requestId: string, response: { result?: any; error?: any }) => {
+    if (wsStatus === 'open') {
+      const message = JSON.stringify({
+        type: 'rpcResponse',
+        requestId: requestId,
+        ...response,
+      }, jsonReplacer);
+      // console.log(`[App.tsx] Sending RPC Response for ${requestId}:`, message); // Reduce noise
+      sendMessage(message);
+    } else {
+      console.error(`[App.tsx] WebSocket not open (state: ${wsStatus}), cannot send RPC response for ${requestId}`);
+    }
+  }, [wsStatus, sendMessage, jsonReplacer]);
 
-    // console.log(`Handling RPC Request ${requestId}:`, payload); // Reduce noise
+  // --- RPC Request Handler (actual implementation) ---
+  const actualHandleRpcRequest = useCallback(async (requestId: string, payload: RpcPayload) => {
+    console.log(`[App.tsx] Handling RPC Request ${requestId}:`, payload.method);
 
-    // Ensure wallet is connected, publicClient is available, AND WebSocket is open
-    if (!isConnected || !address || !chainId || !publicClient || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
-      const wsState = currentWs ? WebSocket.OPEN ? 'open' : WebSocket.CONNECTING ? 'connecting' : WebSocket.CLOSING ? 'closing' : 'closed' : 'null';
-      const errorMsg = !currentWs || currentWs.readyState !== WebSocket.OPEN ? `WebSocket not open (state: ${wsState})` : !publicClient ? 'RPC client unavailable' : 'Wallet not connected';
-      console.error(`${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
-      // Attempt to send error back only if WS was open initially
-      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-        sendRpcResponse(currentWs, requestId, { error: { code: -32000, message: errorMsg } });
+    if (!isConnected || !address || !chainId || !publicClient || wsStatus !== 'open') {
+      const errorMsg = wsStatus !== 'open' ? `WebSocket not open (state: ${wsStatus})`
+        : !publicClient ? 'RPC client unavailable'
+        : 'Wallet not connected';
+      console.error(`[App.tsx] ${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
+      if (wsStatus === 'open') { // Send error only if WS was open
+        sendRpcResponse(requestId, { error: { code: -32000, message: errorMsg } });
       } else {
-        console.warn(`Cannot send error response for ${requestId} because WebSocket is not open.`);
+        console.warn(`[App.tsx] Cannot send error response for ${requestId} because WebSocket is not open.`);
       }
       return;
     }
@@ -498,66 +480,60 @@ function App() {
           }
       }
 
-      // Use the captured WebSocket instance (currentWs) to send the response
       if (error) {
-        sendRpcResponse(currentWs, requestId, { error });
+        sendRpcResponse(requestId, { error });
       } else {
-        sendRpcResponse(currentWs, requestId, { result });
-        setProcessedRequests(count => count + 1); // Increment counter on success
+        sendRpcResponse(requestId, { result });
+        setProcessedRequests(count => count + 1);
       }
 
     } catch (err: any) {
-      console.error(`Error processing RPC request ${requestId} (${payload.method}):`, err);
-      // Use the captured WebSocket instance (currentWs) to send the error response
-      sendRpcResponse(currentWs, requestId, { error: { code: -32603, message: err.message || 'Internal JSON-RPC error' } });
+      console.error(`[App.tsx] Error processing RPC request ${requestId} (${payload.method}):`, err);
+      sendRpcResponse(requestId, { error: { code: -32603, message: err.message || 'Internal JSON-RPC error' } });
     }
-  };
+  }, [
+    isConnected, address, chainId, publicClient, wsStatus, sendRpcResponse, // sendRpcResponse is now stable
+    trackedTxsRef, eip7702SessionAccountRef, // refs
+    // jsonReplacer is used by sendRpcResponse, which has it as a dependency
+  ]);
 
-  // --- Send Response back via WebSocket ---
-  // Helper function to handle BigInt serialization for JSON.stringify
-  const jsonReplacer = (_key: string, value: any) => {
-    if (typeof value === 'bigint') {
-      return value.toString();
-    }
-    return value;
-  };
-
-  // Modify to accept the WebSocket instance as the first argument
-  const sendRpcResponse = (socketInstance: WebSocket, requestId: string, response: { result?: any; error?: any }) => {
-    // No need to check null here as handleRpcRequest already does, but check state
-    if (socketInstance.readyState === WebSocket.OPEN) {
+  // Effect to update the callback passed to the hook when actualHandleRpcRequest changes
+  useEffect(() => {
+    setOnRpcRequestCallback(() => actualHandleRpcRequest);
+  }, [actualHandleRpcRequest]);
+  
+  // --- Sign Response Sender (uses sendMessage from hook) ---
+  const sendSignResponse = useCallback((requestId: string, response: { result?: any; error?: any }) => {
+    if (wsStatus === 'open') {
       const message = JSON.stringify({
-        type: 'rpcResponse',
-        requestId: requestId, // Use the requestId passed to this function
+        type: 'signResponse',
+        requestId: requestId,
         ...response,
-      }, jsonReplacer); // Apply the replacer here
-      // console.log(`Sending RPC Response for ${requestId}:`, message); // Reduce noise
-      socketInstance.send(message);
+      }, jsonReplacer);
+      // console.log(`[App.tsx] Sending Sign Response for ${requestId}:`, message); // Reduce noise
+      sendMessage(message);
     } else {
-      // Log based on the state of the passed instance
-      console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send response for ${requestId}`);
+      console.error(`[App.tsx] WebSocket not open (state: ${wsStatus}), cannot send sign response for ${requestId}`);
     }
-  };
+  }, [wsStatus, sendMessage, jsonReplacer]);
 
   // --- Sign Transaction Handler ---
-  const handleSignTransaction = async (request: SignRequest) => {
-    // Signing logic remains here
+  const handleSignTransaction = useCallback(async (request: SignRequest) => {
     const { requestId, payload } = request;
-    const currentWs = wsRef.current;
 
-    console.log(`Attempting to sign request ${requestId} for method ${payload.method}, Mode: ${activeMode}`);
-    setSigningRequestId(requestId); // Indicate signing has started for this request
+    console.log(`[App.tsx] Attempting to sign request ${requestId} for method ${payload.method}, Mode: ${activeMode}`);
+    setSigningRequestId(requestId);
 
-    // Basic checks needed regardless of mode
-    if (!currentWs || currentWs.readyState !== WebSocket.OPEN || !chainId || !publicClient) {
-      const reason = !currentWs || currentWs.readyState !== WebSocket.OPEN ? 'WebSocket not open'
+    if (wsStatus !== 'open' || !chainId || !publicClient) {
+      const reason = wsStatus !== 'open' ? `WebSocket not open (state: ${wsStatus})`
         : !chainId ? 'Chain ID not available'
           : 'Public client not available';
-      console.error(`${reason}, cannot sign transaction for ${requestId}`);
-      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-        sendSignResponse(currentWs, requestId, { error: { code: -32000, message: reason } });
+      console.error(`[App.tsx] ${reason}, cannot sign transaction for ${requestId}`);
+      if (wsStatus === 'open') { // Send error only if WS was open
+        sendSignResponse(requestId, { error: { code: -32000, message: reason } });
       }
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+      setSigningRequestId(null); // Clear signing ID as we are returning early
       return;
     }
 
@@ -879,9 +855,8 @@ function App() {
 
       // Remove the request from the UI *before* sending the response
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-      // Send success response back (result is now actualTxHash for EIP-7702)
-      sendSignResponse(currentWs, requestId, { result });
-      setProcessedRequests(count => count + 1); // Increment counter on success
+      sendSignResponse(requestId, { result }); // Use updated sendSignResponse
+      setProcessedRequests(count => count + 1);
 
     } catch (err: any) {
       // If an error occurred during EIP-7702 flow, and we had a userOpHash, mark it as reverted.
@@ -905,46 +880,37 @@ function App() {
       }
 
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-      console.error(`Error signing/sending transaction for ${requestId}:`, err);
-      const errorCode = err.code === 4001 ? 4001 : -32000;
+      console.error(`[App.tsx] Error signing/sending transaction for ${requestId}:`, err);
+      const errorCode = err.code === 4001 ? 4001 : -32000; // Standardize error code for user rejection
       const errorMessage = err.shortMessage || err.message || 'User rejected or transaction failed';
-      sendSignResponse(currentWs, requestId, { error: { code: errorCode, message: errorMessage } });
+      sendSignResponse(requestId, { error: { code: errorCode, message: errorMessage } }); // Use updated sendSignResponse
     } finally {
-      setSigningRequestId(null); // Indicate signing has finished for this request
+      setSigningRequestId(null);
     }
-  };
+  }, [
+    activeMode, chainId, publicClient, walletClient, address, // wagmi state
+    wsStatus, sendSignResponse, // from hook & memoized sender
+    setPendingSignRequests, setSigningRequestId, setProcessedRequests, // local state setters
+    eip7702SessionAccountRef, // ref
+    sanitizeTransactionRequest, generateTxLabel, // utils
+    areCandideUrlsConfigured, // constant
+    rpcUrlForSessionClient, // derived variable (ensure stability or include dependencies)
+    eip7702PrivateKey, // state for EIP-7702
+    // jsonReplacer is used by sendSignResponse
+  ]);
 
   // --- Reject Transaction Handler ---
-  const handleRejectTransaction = (requestId: string) => {
-    // Rejection logic remains here
-    const currentWs = wsRef.current;
-    console.log(`User rejected request ${requestId}`);
-    if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-      sendSignResponse(currentWs, requestId, {
+  const handleRejectTransaction = useCallback((requestId: string) => {
+    console.log(`[App.tsx] User rejected request ${requestId}`);
+    if (wsStatus === 'open') { // Use wsStatus from hook
+      sendSignResponse(requestId, { // Use updated sendSignResponse
         error: { code: 4001, message: 'User rejected the request.' }
       });
     } else {
-      console.warn(`Cannot send rejection for ${requestId} because WebSocket is not open.`);
+      console.warn(`[App.tsx] Cannot send rejection for ${requestId} because WebSocket is not open (state: ${wsStatus}).`);
     }
-    // Remove the request from the UI
     setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
-  };
-
-  // --- Send Signing Response back via WebSocket ---
-  const sendSignResponse = (socketInstance: WebSocket, requestId: string, response: { result?: any; error?: any }) => {
-    // Sending sign response logic remains here
-    if (socketInstance.readyState === WebSocket.OPEN) {
-      const message = JSON.stringify({
-        type: 'signResponse', // Use 'signResponse' type
-        requestId: requestId,
-        ...response,
-      }, jsonReplacer); // Apply the replacer here
-      // console.log(`Sending Sign Response for ${requestId}:`, message); // Reduce noise
-      socketInstance.send(message);
-    } else {
-      console.error(`WebSocket not open (state: ${socketInstance.readyState}), cannot send sign response for ${requestId}`);
-    }
-  };
+  }, [wsStatus, sendSignResponse]); // setPendingSignRequests is stable
 
 
   // Determine RPC URL for potential local client use
