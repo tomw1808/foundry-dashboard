@@ -1,4 +1,4 @@
-import { Circle } from 'lucide-react';
+import { Network } from 'lucide-react';
 import { WsStatus } from '@/types';
 import {
     Tooltip,
@@ -43,7 +43,7 @@ export function DashboardHeader({ wsStatus }: DashboardHeaderProps) {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Circle className={`h-5 w-5 ${statusColor}`} />
+                        <Network className={`h-5 w-5 ${statusColor}`} />
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>{statusTooltip}</p>
