@@ -4,23 +4,28 @@ import { PrivateKeyAccount, generatePrivateKey, privateKeyToAccount } from 'viem
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Copy, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch'; // Import Switch
+import { AlertCircle, Eye, EyeOff, Copy, RefreshCw } from 'lucide-react'; // Import AlertCircle
 import { copyToClipboard } from '@/lib/utils';
 
 interface Eip7702ModeDisplayProps {
     privateKey: Hex | null;
     sessionAccount: PrivateKeyAccount | null;
     setPrivateKey: (key: Hex | null) => void;
-    rpcUrl: string; // Needed for local client later
-    chainId: number | undefined; // Needed for local client later
+    persistKey: boolean;
+    setPersistKey: (persist: boolean) => void;
+    rpcUrl: string;
+    chainId: number | undefined;
 }
 
 export function Eip7702ModeDisplay({
     privateKey,
     sessionAccount,
     setPrivateKey,
-    // rpcUrl, // Pass down for potential local client use - not used yet
-    // chainId, // Pass down for potential local client use - not used yet
+    persistKey,
+    setPersistKey,
+    // rpcUrl,
+    // chainId,
 }: Eip7702ModeDisplayProps) {
     const [showPrivateKey, setShowPrivateKey] = useState(false);
     const [inputPrivateKey, setInputPrivateKey] = useState<string>('');
@@ -96,8 +101,7 @@ export function Eip7702ModeDisplay({
                 </Button>
             </div>
 
-
-            <div className="space-y-2">
+            <div className="space-y-2 mb-6">
                  <Label htmlFor="manual-pk" className="text-gray-400">Set Private Key Manually:</Label>
                  <div className="flex items-center space-x-2">
                     <Input
@@ -112,6 +116,27 @@ export function Eip7702ModeDisplay({
                  </div>
                  {inputError && <p className="text-xs text-red-400 mt-1">{inputError}</p>}
             </div>
+
+            <div className="flex items-center space-x-2 mb-4">
+                <Switch
+                    id="persist-pk-toggle"
+                    checked={persistKey}
+                    onCheckedChange={setPersistKey}
+                />
+                <Label htmlFor="persist-pk-toggle" className="text-sm text-gray-300">
+                    Persist private key in browser local storage
+                </Label>
+            </div>
+            {persistKey && (
+                <div className="flex items-start space-x-2 p-3 bg-yellow-900/30 border border-yellow-700 rounded text-yellow-200 text-xs mb-4">
+                    <AlertCircle size={18} className="flex-shrink-0 mt-0.5 text-yellow-400" />
+                    <p>
+                        <strong>Warning:</strong> Storing private keys in local storage is convenient for development but insecure.
+                        Anyone with access to your browser console can potentially retrieve the key.
+                        Do not use this feature with real funds or on mainnet.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

@@ -116,17 +116,62 @@ function App() {
   const eip7702SessionAccountRef = useRef(_eip7702SessionAccount); // Ref for up-to-date access in closures
   const [signingRequestId, setSigningRequestId] = useState<string | null>(null); // Tracks the ID of the request being signed
 
+  // State for persisting EIP-7702 private key in local storage
+  const [persistKeyInLocalStorage, setPersistKeyInLocalStorage] = useState<boolean>(() => {
+    const storedPreference = localStorage.getItem('foundryDashboard_eip7702_persistPreference');
+    return storedPreference === 'true';
+  });
+
   // --- WebSocket Connection logic is now in useWebSocketManager ---
 
-  // --- Generate EIP-7702 Session Key Effect ---
+  // --- Load/Generate EIP-7702 Session Key Effect ---
   useEffect(() => {
-    // Generate key only if switching to EIP-7702 mode and no key exists yet
-    if (activeMode === 'eip7702' && !eip7702PrivateKey) {
-      console.log("Generating initial EIP-7702 session private key...");
+    let loadedKey: Hex | null = null;
+    if (persistKeyInLocalStorage) {
+      const storedKey = localStorage.getItem('foundryDashboard_eip7702_privateKey');
+      if (storedKey && storedKey.startsWith('0x') && storedKey.length === 66) {
+        try {
+          privateKeyToAccount(storedKey as Hex); // Validate key format
+          loadedKey = storedKey as Hex;
+          console.log("Loaded EIP-7702 session private key from local storage.");
+          setEip7702PrivateKey(loadedKey);
+        } catch (e) {
+          console.warn("Invalid private key found in local storage. Ignoring.", e);
+          localStorage.removeItem('foundryDashboard_eip7702_privateKey'); // Clean up invalid key
+        }
+      }
+    }
+
+    if (!loadedKey && activeMode === 'eip7702' && !eip7702PrivateKey) {
+      console.log("Generating initial EIP-7702 session private key (not found in local storage or persistence off)...");
       const newPrivateKey = generatePrivateKey();
       setEip7702PrivateKey(newPrivateKey);
+      // If persistence is on, this new key will be saved by the effect below
     }
-  }, [activeMode, eip7702PrivateKey]); // Run when mode changes or key is cleared
+  }, [activeMode, persistKeyInLocalStorage]); // Rerun if mode changes or persistence preference changes
+
+  // --- Effect to Save/Remove EIP-7702 Private Key based on Persistence ---
+  useEffect(() => {
+    if (persistKeyInLocalStorage) {
+      if (eip7702PrivateKey) {
+        localStorage.setItem('foundryDashboard_eip7702_privateKey', eip7702PrivateKey);
+        console.log("Saved EIP-7702 private key to local storage.");
+      } else {
+        // If key becomes null while persistence is on, remove it (e.g. user clears it manually)
+        localStorage.removeItem('foundryDashboard_eip7702_privateKey');
+      }
+    } else {
+      // If persistence is turned off, remove any stored key
+      localStorage.removeItem('foundryDashboard_eip7702_privateKey');
+      console.log("Removed EIP-7702 private key from local storage (persistence disabled).");
+    }
+  }, [eip7702PrivateKey, persistKeyInLocalStorage]);
+
+  // --- Effect to Save Persistence Preference ---
+  useEffect(() => {
+    localStorage.setItem('foundryDashboard_eip7702_persistPreference', persistKeyInLocalStorage.toString());
+  }, [persistKeyInLocalStorage]);
+
 
   // --- Derive EIP-7702 Session Account Effect ---
   useEffect(() => {
@@ -1010,8 +1055,10 @@ function App() {
               privateKey={eip7702PrivateKey}
               sessionAccount={_eip7702SessionAccount}
               setPrivateKey={setEip7702PrivateKey}
-              rpcUrl={rpcUrlForLocalClient} // This prop might not be actively used by Eip7702ModeDisplay currently
-              chainId={chainId} // This prop might not be actively used by Eip7702ModeDisplay currently
+              persistKey={persistKeyInLocalStorage}
+              setPersistKey={setPersistKeyInLocalStorage}
+              rpcUrl={rpcUrlForLocalClient} 
+              chainId={chainId} 
             />
             <Alert className="mt-6 border-blue-500 bg-blue-900/30 text-blue-200">
               <Terminal className="h-4 w-4 !text-blue-400" />
