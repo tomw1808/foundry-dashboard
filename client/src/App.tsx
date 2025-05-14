@@ -391,9 +391,14 @@ function App() {
                 const expectedEmitterAddress = eip7702SessionAccount?.address;
 
                 for (const log of originalReceipt.logs) {
+                  console.log("checking log", {log});
+                  console.log("log address is equal", (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase()));
+                  console.log("topic is equal", log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC);
                   // Check if the log is from the expected emitter and matches the event topic
                   if (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase() &&
                       log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
+
+                        console.log(`Found the topic`, {log})
                     
                     // The contract address is in the data field. Data is 0x + 64 hex chars (32 bytes).
                     // The address is the last 20 bytes (40 hex chars).
