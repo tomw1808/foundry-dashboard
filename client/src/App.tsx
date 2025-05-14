@@ -8,7 +8,7 @@ import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionR
 import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
 
 import { DashboardHeader } from '@/components/DashboardHeader'; // Import DashboardHeader
-import { DashboardStatus } from '@/components/DashboardStatus';
+// import { DashboardStatus } from '@/components/DashboardStatus'; // No longer needed
 import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
 // import { Switch } from '@/components/ui/switch'; // No longer needed
