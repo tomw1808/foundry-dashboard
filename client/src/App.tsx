@@ -901,8 +901,25 @@ function App() {
     // rpcUrlForSessionClient will be defined outside and passed as a dependency
     eip7702PrivateKey, // state for EIP-7702
     // jsonReplacer is used by sendSignResponse
-    rpcUrlForSessionClient, // Add the memoized version here
+    rpcUrlForSessionClient, // Now correctly placed after rpcUrlForSessionClient declaration
   ]);
+
+  // Determine RPC URL for potential local client use (used by Eip7702ModeDisplay and EIP-7702 signing)
+  const rpcUrlForSessionClient = useMemo(() => {
+    let url = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback
+    if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
+      const clientRpcUrl = publicClient.transport.config.url;
+      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+        url = clientRpcUrl;
+      }
+    }
+    return url;
+  }, [publicClient]); // Depends on publicClient
+
+  // Update the dependency array of handleSignTransaction to include the now-defined rpcUrlForSessionClient
+  // This requires a re-definition or a more complex state update if handleSignTransaction itself needs to be memoized
+  // For simplicity in this step, we'll assume the dependency array of handleSignTransaction will be updated
+  // after this move. The key is to declare rpcUrlForSessionClient first.
 
   // --- Reject Transaction Handler ---
   const handleRejectTransaction = useCallback((requestId: string) => {
@@ -917,20 +934,8 @@ function App() {
     setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
   }, [wsStatus, sendSignResponse]); // setPendingSignRequests is stable
 
-
-  // Determine RPC URL for potential local client use (used by Eip7702ModeDisplay and EIP-7702 signing)
-  const rpcUrlForSessionClient = useMemo(() => {
-    let url = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback
-    if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
-      const clientRpcUrl = publicClient.transport.config.url;
-      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
-        url = clientRpcUrl;
-      }
-    }
-    return url;
-  }, [publicClient]); // Depends on publicClient
-
   // rpcUrlForLocalClient is the same as rpcUrlForSessionClient, just aliased for clarity if needed elsewhere.
+  // This was moved up, so rpcUrlForLocalClient can now be defined using the moved rpcUrlForSessionClient
   const rpcUrlForLocalClient = rpcUrlForSessionClient;
 
 
