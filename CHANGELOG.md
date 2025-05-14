@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.0...v2.0.1) (2025-05-14)
+
+
+### Bug Fixes
+
+* added bundler/paymaster hardcoded urls ([83e0f75](https://github.com/tomw1808/foundry-dashboard/commit/83e0f75f88cd2355bb4ac581a0e896b5675856ba))
+
 ## [2.0.0](https://github.com/tomw1808/foundry-dashboard/compare/v1.2.0...v2.0.0) (2025-05-14)
 
 
