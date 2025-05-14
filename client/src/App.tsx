@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Ad
 import { Address, BlockTag, Hex, serializeSignature, toHex } from 'viem';
 
 // Import types and components
-import { SignRequest, TrackedTxInfo, RpcPayload, WsStatus } from '@/types'; // WsStatus is used by the hook
+import { SignRequest, TrackedTxInfo, RpcPayload } from '@/types'; // WsStatus is used by the hook
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
 
@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // For helper text
 import { Button } from '@/components/ui/button'; // For copy button
 import { Copy, Terminal } from 'lucide-react'; // For icons
-import { ConnectButton } from '@rainbow-me/rainbowkit'; // Assuming RainbowKit ConnectButton
 
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
