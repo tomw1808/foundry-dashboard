@@ -32,10 +32,7 @@ const PAYMASTER_URL_PLACEHOLDER = "https://api.candide.dev/paymaster/v3/sepolia/
 const ACTUAL_BUNDLER_URL = BUNDLER_URL_PLACEHOLDER;
 const ACTUAL_PAYMASTER_URL = PAYMASTER_URL_PLACEHOLDER;
 
-const areCandideUrlsConfigured =
-  ACTUAL_BUNDLER_URL !== BUNDLER_URL_PLACEHOLDER &&
-  ACTUAL_PAYMASTER_URL !== PAYMASTER_URL_PLACEHOLDER &&
-  !!ACTUAL_BUNDLER_URL && // Ensure they are not empty strings if env var is set to ""
+const areCandideUrlsConfigured = !!ACTUAL_BUNDLER_URL && // Ensure they are not empty strings if env var is set to ""
   !!ACTUAL_PAYMASTER_URL;
 // Entry point used by Candide's Simple7702Account (v0.8.0 as per abstractionkit constants)
 const CANDIDE_ENTRY_POINT_ADDRESS = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108";
