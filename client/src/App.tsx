@@ -387,7 +387,7 @@ function App() {
                 // Define the ABI for your ContractDeployed event from your custom Simple7702Account
                 const contractDeployedEventAbi = [{
                   type: 'event',
-                  name: 'ContractDeployed', // Ensure this matches your event name
+                  name: 'ContractCreated', // Ensure this matches your event name
                   inputs: [
                     { name: 'newContractAddress', type: 'address', indexed: false }, // Assuming not indexed
                   ],
@@ -405,7 +405,7 @@ function App() {
                         topics: log.topics,
                         strict: false, // Be less strict if topics might not perfectly match
                       });
-                      if (decodedLog.eventName === 'ContractDeployed') {
+                      if (decodedLog.eventName === 'ContractCreated') {
                         // Access args based on your event definition
                         deployedContractAddress = (decodedLog.args as { newContractAddress: Address }).newContractAddress;
                         console.log(`[${requestId}] Found deployed contract address from event: ${deployedContractAddress}`);
