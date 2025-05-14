@@ -76,17 +76,23 @@ function App() {
     );
   }, []); // setPendingSignRequests is stable
 
-  // Define state to hold the memoized onRpcRequest callback for the hook
-  // This helps break the circular dependency: hook needs onRpcRequest, onRpcRequest needs hook's sendMessage
-  const [onRpcRequestCallback, setOnRpcRequestCallback] = useState<(requestId: string, payload: RpcPayload) => void>(
-    () => async (requestId: string, payload: RpcPayload) => {
-      console.warn(`[App.tsx] onRpcRequest called before initialization for ${requestId}`, payload.method);
+  // Ref to hold the latest version of the RPC request handler
+  const actualHandleRpcRequestRef = useRef<((requestId: string, payload: RpcPayload) => Promise<void>) | null>(null);
+
+  // This callback is stable and passed to useWebSocketManager.
+  // It calls the latest version of actualHandleRpcRequest via the ref.
+  const stableOnRpcRequest = useCallback((requestId: string, payload: RpcPayload) => {
+    if (actualHandleRpcRequestRef.current) {
+      actualHandleRpcRequestRef.current(requestId, payload);
+    } else {
+      // This might happen if a message comes in before actualHandleRpcRequest is fully initialized.
+      console.warn(`[App.tsx] stableOnRpcRequest called but actualHandleRpcRequestRef.current is not yet set for ${requestId}`, payload.method);
     }
-  );
+  }, []); // Empty dependency array ensures this callback is stable
 
   const { wsStatus, sendMessage } = useWebSocketManager({
-    onRpcRequest: onRpcRequestCallback,
-    onSignRequestReceived: handleSignRequestReceived,
+    onRpcRequest: stableOnRpcRequest,
+    onSignRequestReceived: handleSignRequestReceived, // This is already stable
   });
 
   // --- Tracked Transactions State with Ref for Closures ---
@@ -497,9 +503,10 @@ function App() {
     // jsonReplacer is used by sendRpcResponse, which has it as a dependency
   ]);
 
-  // Effect to update the callback passed to the hook when actualHandleRpcRequest changes
+  // Effect to update the ref with the latest actualHandleRpcRequest
+  // This ensures stableOnRpcRequest always calls the most up-to-date handler.
   useEffect(() => {
-    setOnRpcRequestCallback(() => actualHandleRpcRequest);
+    actualHandleRpcRequestRef.current = actualHandleRpcRequest;
   }, [actualHandleRpcRequest]);
 
   // --- Sign Response Sender (uses sendMessage from hook) ---
