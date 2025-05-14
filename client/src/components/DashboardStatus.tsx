@@ -12,7 +12,7 @@ interface DashboardStatusProps {
 }
 
 export function DashboardStatus({
-    wsStatus,
+    // wsStatus, // Removed from props
     isConnected,
     address,
     chainId,
@@ -21,12 +21,7 @@ export function DashboardStatus({
 }: DashboardStatusProps) {
     return (
         <div className="mb-4">
-            {/* Display status based on wsStatus state */}
-            <p>WebSocket Status: {
-                wsStatus === 'open' ? <span className="text-green-400">Connected</span> :
-                wsStatus === 'connecting' ? <span className="text-yellow-400">Connecting...</span> :
-                <span className="text-red-400">{wsStatus === 'error' ? 'Error' : 'Disconnected'}</span>
-            }</p>
+            {/* WebSocket Status is now in DashboardHeader */}
             <p>Wallet Status: {isConnected ? <span className="text-green-400">Connected</span> : <span className="text-red-400">Not Connected</span>}</p>
             {isConnected && address && ( // Ensure address exists
                 <>

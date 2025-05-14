@@ -7,6 +7,7 @@ import { SignRequest, TrackedTxInfo, RpcPayload, WsStatus } from '@/types'; // W
 import { getExplorerLink, copyToClipboard, generateTxLabel, sanitizeTransactionRequest } from '@/lib/utils'; // Import sanitizeTransactionRequest
 import { Simple7702Account, UserOperationV8, MetaTransaction, CandidePaymaster, createUserOperationHash } from "abstractionkit"; // EIP-7702
 
+import { DashboardHeader } from '@/components/DashboardHeader'; // Import DashboardHeader
 import { DashboardStatus } from '@/components/DashboardStatus';
 import { PendingActionsList } from '@/components/PendingActionsList';
 import { TrackedTransactionsList } from '@/components/TrackedTransactionsList';
@@ -950,11 +951,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
-      {/* Replace Header with Tabs */}
-      <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700 mb-6">
-        <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
-        {/* ConnectButton will be moved into the Browser Wallet tab */}
-      </header>
+      <DashboardHeader wsStatus={wsStatus} />
 
       {/* Dashboard Status moved above tabs */}
       <div className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mb-6">
