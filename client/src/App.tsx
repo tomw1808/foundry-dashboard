@@ -1,5 +1,5 @@
 import { useAccount, usePublicClient, useWalletClient, useWatchBlockNumber } from 'wagmi';
-import { useEffect, useState, useRef, useCallback } from 'react'; // Added useCallback
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'; // Added useCallback
 import { Address, BlockTag, Hex, serializeSignature, toHex } from 'viem';
 
 // Import types and components
@@ -70,9 +70,9 @@ function App() {
   const handleSignRequestReceived = useCallback((request: SignRequest) => {
     console.log('[App.tsx] Received signRequest:', request.requestId, request.payload?.method);
     setPendingSignRequests((prev) =>
-        prev.find((req) => req.requestId === request.requestId)
-            ? prev
-            : [...prev, request]
+      prev.find((req) => req.requestId === request.requestId)
+        ? prev
+        : [...prev, request]
     );
   }, []); // setPendingSignRequests is stable
 
@@ -83,7 +83,7 @@ function App() {
       console.warn(`[App.tsx] onRpcRequest called before initialization for ${requestId}`, payload.method);
     }
   );
-  
+
   const { wsStatus, sendMessage } = useWebSocketManager({
     onRpcRequest: onRpcRequestCallback,
     onSignRequestReceived: handleSignRequestReceived,
@@ -290,7 +290,7 @@ function App() {
     if (!isConnected || !address || !chainId || !publicClient || wsStatus !== 'open') {
       const errorMsg = wsStatus !== 'open' ? `WebSocket not open (state: ${wsStatus})`
         : !publicClient ? 'RPC client unavailable'
-        : 'Wallet not connected';
+          : 'Wallet not connected';
       console.error(`[App.tsx] ${errorMsg}, cannot handle RPC request ${requestId} (${payload.method})`);
       if (wsStatus === 'open') { // Send error only if WS was open
         sendRpcResponse(requestId, { error: { code: -32000, message: errorMsg } });
@@ -380,27 +380,27 @@ function App() {
                 console.log(`[${requestId}] eth_getTransactionReceipt EIP-7702: expectedEmitterAddress = ${expectedEmitterAddress}`);
 
                 for (const log of originalReceipt.logs) {
-                  
+
                   // Check if the log is from the expected emitter and matches the event topic
                   if (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase() &&
-                      log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
+                    log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
 
-                        console.log(`[${requestId}] Found ContractCreated event log from expected emitter ${expectedEmitterAddress}`, {log})
-                    
+                    console.log(`[${requestId}] Found ContractCreated event log from expected emitter ${expectedEmitterAddress}`, { log })
+
                     // The contract address is in the data field. Data is 0x + 64 hex chars (32 bytes).
                     // The address is the last 20 bytes (40 hex chars).
                     if (log.data && log.data.length === 66) { // 0x + 32 bytes * 2 chars/byte
-                        const addressHex = `0x${log.data.substring(26)}`; // 2 (for "0x") + (32-20)*2 = 2 + 24 = 26
-                        try {
-                            deployedContractAddress = getAddress(addressHex); // Converts to checksummed address
-                            console.log(`[${requestId}] Extracted deployed contract address from log data: ${deployedContractAddress}`);
-                            break; // Found the address
-                        } catch (checksumError) {
-                            console.warn(`[${requestId}] Failed to checksum extracted address ${addressHex}:`, checksumError);
-                            // Potentially log this as an issue, but don't break if other logs might be valid
-                        }
+                      const addressHex = `0x${log.data.substring(26)}`; // 2 (for "0x") + (32-20)*2 = 2 + 24 = 26
+                      try {
+                        deployedContractAddress = getAddress(addressHex); // Converts to checksummed address
+                        console.log(`[${requestId}] Extracted deployed contract address from log data: ${deployedContractAddress}`);
+                        break; // Found the address
+                      } catch (checksumError) {
+                        console.warn(`[${requestId}] Failed to checksum extracted address ${addressHex}:`, checksumError);
+                        // Potentially log this as an issue, but don't break if other logs might be valid
+                      }
                     } else {
-                        console.warn(`[${requestId}] ContractCreated event log data has unexpected length: ${log.data}`);
+                      console.warn(`[${requestId}] ContractCreated event log data has unexpected length: ${log.data}`);
                     }
                   }
                 }
@@ -501,7 +501,7 @@ function App() {
   useEffect(() => {
     setOnRpcRequestCallback(() => actualHandleRpcRequest);
   }, [actualHandleRpcRequest]);
-  
+
   // --- Sign Response Sender (uses sendMessage from hook) ---
   const sendSignResponse = useCallback((requestId: string, response: { result?: any; error?: any }) => {
     if (wsStatus === 'open') {
@@ -516,6 +516,18 @@ function App() {
       console.error(`[App.tsx] WebSocket not open (state: ${wsStatus}), cannot send sign response for ${requestId}`);
     }
   }, [wsStatus, sendMessage, jsonReplacer]);
+  
+  // Determine RPC URL for potential local client use (used by Eip7702ModeDisplay and EIP-7702 signing)
+  const rpcUrlForSessionClient = useMemo(() => {
+    let url = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback
+    if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
+      const clientRpcUrl = publicClient.transport.config.url;
+      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
+        url = clientRpcUrl;
+      }
+    }
+    return url;
+  }, [publicClient]); // Depends on publicClient
 
   // --- Sign Transaction Handler ---
   const handleSignTransaction = useCallback(async (request: SignRequest) => {
@@ -613,41 +625,41 @@ function App() {
         let metaTx: MetaTransaction;
 
         if (!sanitizedTx.to) { // Contract Creation
-            console.log(`[${requestId}] Handling contract creation via EIP-7702 custom createContract method.`);
-            if (!sanitizedTx.data) {
-                throw new Error("Contract creation requested but no initCode (sanitizedTx.data) found.");
-            }
-            const initCodeFromFoundry = sanitizedTx.data as Hex;
+          console.log(`[${requestId}] Handling contract creation via EIP-7702 custom createContract method.`);
+          if (!sanitizedTx.data) {
+            throw new Error("Contract creation requested but no initCode (sanitizedTx.data) found.");
+          }
+          const initCodeFromFoundry = sanitizedTx.data as Hex;
 
-            // ABI for your createContract function
-            const createContractAbi = [{
-                type: 'function',
-                name: 'createContract',
-                inputs: [{ name: 'initCode', type: 'bytes' }],
-                // outputs: [{ name: 'newContract', type: 'address' }], // Optional: if your contract returns it
-                stateMutability: 'payable', // Or 'nonpayable' if it doesn't handle value
-            }] as const;
+          // ABI for your createContract function
+          const createContractAbi = [{
+            type: 'function',
+            name: 'createContract',
+            inputs: [{ name: 'initCode', type: 'bytes' }],
+            // outputs: [{ name: 'newContract', type: 'address' }], // Optional: if your contract returns it
+            stateMutability: 'payable', // Or 'nonpayable' if it doesn't handle value
+          }] as const;
 
-            const callDataForCreateContract = encodeFunctionData({
-                abi: createContractAbi,
-                functionName: 'createContract',
-                args: [initCodeFromFoundry],
-            });
+          const callDataForCreateContract = encodeFunctionData({
+            abi: createContractAbi,
+            functionName: 'createContract',
+            args: [initCodeFromFoundry],
+          });
 
-            metaTx = {
-                to: currentEip7702SessionAccount.address, // Target the Simple7702Account itself (using address from ref)
-                value: sanitizedTx.value || 0n,    // Pass through any value sent with the deployment
-                data: callDataForCreateContract,
-            };
-            console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702 contract creation");
+          metaTx = {
+            to: currentEip7702SessionAccount.address, // Target the Simple7702Account itself (using address from ref)
+            value: sanitizedTx.value || 0n,    // Pass through any value sent with the deployment
+            data: callDataForCreateContract,
+          };
+          console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702 contract creation");
 
         } else { // Standard function call
-            metaTx = {
-                to: sanitizedTx.to as Address,
-                value: sanitizedTx.value || 0n,
-                data: sanitizedTx.data || "0x",
-            };
-            console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702 function call");
+          metaTx = {
+            to: sanitizedTx.to as Address,
+            value: sanitizedTx.value || 0n,
+            data: sanitizedTx.data || "0x",
+          };
+          console.debug({ metaTx }, "Prepared MetaTransaction for EIP-7702 function call");
         }
 
         // --- EIP-7702 Specific Logic Continues from here with metaTx ---
@@ -755,19 +767,19 @@ function App() {
         const decodedInfoForEip7702 = payload.decoded;
 
         if (currentChainIdForEip7702) {
-            const initialTrackedTx: TrackedTxInfo = {
-                hash: userOpHashForTracking,
-                status: 'checking', // Indicates we are waiting for UserOp inclusion
-                confirmations: 0,
-                timestamp: Date.now(),
-                chainId: currentChainIdForEip7702,
-                label: `EIP-7702 Session: ${generateTxLabel(decodedInfoForEip7702)} (UserOp)`,
-                isEip7702Deployment: !sanitizedTx.to, // Set based on original tx's 'to' field
-                // actualTxHash will be filled after inclusion
-            };
-            setTrackedTxs(prevMap => new Map(prevMap).set(userOpHashForTracking, initialTrackedTx));
+          const initialTrackedTx: TrackedTxInfo = {
+            hash: userOpHashForTracking,
+            status: 'checking', // Indicates we are waiting for UserOp inclusion
+            confirmations: 0,
+            timestamp: Date.now(),
+            chainId: currentChainIdForEip7702,
+            label: `EIP-7702 Session: ${generateTxLabel(decodedInfoForEip7702)} (UserOp)`,
+            isEip7702Deployment: !sanitizedTx.to, // Set based on original tx's 'to' field
+            // actualTxHash will be filled after inclusion
+          };
+          setTrackedTxs(prevMap => new Map(prevMap).set(userOpHashForTracking, initialTrackedTx));
         }
-        console.log({sendUserOpResponse})
+        console.log({ sendUserOpResponse })
 
         console.log(`[${requestId}] UserOp ${userOpHashForTracking} sent! Waiting for inclusion...`);
         const receiptResult = await sendUserOpResponse.included(); // Wait for the UserOp to be included
@@ -777,20 +789,20 @@ function App() {
 
         // Update trackedTxs with the final status and actual transaction hash
         setTrackedTxs(prevMap => {
-            const existingTx = prevMap.get(userOpHashForTracking);
-            if (existingTx) {
-                const updatedTxInfo: TrackedTxInfo = {
-                    ...existingTx,
-                    status: receiptResult.success ? 'success' : 'reverted',
-                    blockNumber: receiptResult.receipt?.blockNumber,
-                    actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
-                    // isEip7702Deployment is carried over from existingTx via spread (...)
-                    // No need to explicitly set it again here as it's determined at initialTrackedTx creation
-                    // and doesn't change.
-                };
-                return new Map(prevMap).set(userOpHashForTracking, updatedTxInfo);
-            }
-            return prevMap; // Should ideally always find the existingTx
+          const existingTx = prevMap.get(userOpHashForTracking);
+          if (existingTx) {
+            const updatedTxInfo: TrackedTxInfo = {
+              ...existingTx,
+              status: receiptResult.success ? 'success' : 'reverted',
+              blockNumber: receiptResult.receipt?.blockNumber,
+              actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
+              // isEip7702Deployment is carried over from existingTx via spread (...)
+              // No need to explicitly set it again here as it's determined at initialTrackedTx creation
+              // and doesn't change.
+            };
+            return new Map(prevMap).set(userOpHashForTracking, updatedTxInfo);
+          }
+          return prevMap; // Should ideally always find the existingTx
         });
 
       } else { // This 'else' corresponds to: if NOT (activeMode === 'eip7702' && chainId === 11155111 && currentEip7702SessionAccount)
@@ -865,22 +877,22 @@ function App() {
     } catch (err: any) {
       // If an error occurred during EIP-7702 flow, and we had a userOpHash, mark it as reverted.
       if (activeMode === 'eip7702' && payload.params?.[0]) { // Check if it was an EIP-7702 attempt
-          // We need a way to get the userOpHash if it was generated before the error.
-          // This part is tricky if the error happens before userOpHash is obtained.
-          // For now, if an error is caught here, the initial 'checking' entry might remain.
-          // A more robust solution would involve passing userOpHashForTracking out of the EIP-7702 block's try-catch.
-          // However, if sendUserOpResponse.included() itself throws, the 'result' won't be set.
-          trackedTxsRef.current.forEach((tx) => { // Attempt to find and update the UserOp status using the ref
-            if (tx.label.includes(generateTxLabel(payload.decoded)) && tx.status === 'checking') {
-              setTrackedTxs(prevMap => {
-                const existingTx = prevMap.get(tx.hash); // prevMap here is from the setTrackedTxs closure, which is fine
-                if (existingTx) {
-                  return new Map(prevMap).set(tx.hash, { ...existingTx, status: 'reverted' });
-                }
-                return prevMap;
-              });
-            }
-          });
+        // We need a way to get the userOpHash if it was generated before the error.
+        // This part is tricky if the error happens before userOpHash is obtained.
+        // For now, if an error is caught here, the initial 'checking' entry might remain.
+        // A more robust solution would involve passing userOpHashForTracking out of the EIP-7702 block's try-catch.
+        // However, if sendUserOpResponse.included() itself throws, the 'result' won't be set.
+        trackedTxsRef.current.forEach((tx) => { // Attempt to find and update the UserOp status using the ref
+          if (tx.label.includes(generateTxLabel(payload.decoded)) && tx.status === 'checking') {
+            setTrackedTxs(prevMap => {
+              const existingTx = prevMap.get(tx.hash); // prevMap here is from the setTrackedTxs closure, which is fine
+              if (existingTx) {
+                return new Map(prevMap).set(tx.hash, { ...existingTx, status: 'reverted' });
+              }
+              return prevMap;
+            });
+          }
+        });
       }
 
       setPendingSignRequests((prev) => prev.filter((req) => req.requestId !== requestId));
@@ -904,17 +916,7 @@ function App() {
     rpcUrlForSessionClient, // Now correctly placed after rpcUrlForSessionClient declaration
   ]);
 
-  // Determine RPC URL for potential local client use (used by Eip7702ModeDisplay and EIP-7702 signing)
-  const rpcUrlForSessionClient = useMemo(() => {
-    let url = CANDIDE_SEPOLIA_RPC_URL; // Default/fallback
-    if (publicClient && publicClient.transport && typeof publicClient.transport.config?.url === 'string') {
-      const clientRpcUrl = publicClient.transport.config.url;
-      if (clientRpcUrl.startsWith('http://') || clientRpcUrl.startsWith('https://')) {
-        url = clientRpcUrl;
-      }
-    }
-    return url;
-  }, [publicClient]); // Depends on publicClient
+
 
   // Update the dependency array of handleSignTransaction to include the now-defined rpcUrlForSessionClient
   // This requires a re-definition or a more complex state update if handleSignTransaction itself needs to be memoized
@@ -989,15 +991,15 @@ function App() {
                       </Button>
                     </div>
                     <div className='text-sm text-gray-300'>
-                      
-                        Call the Foundry-Script with
-                      
-                        <span className='font-mono pl-2'>
-                        forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {address} --unlocked 
-                        </span> <Button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${address} --unlocked`)} title="Copy command" variant="ghost" size="icon" >
-                          <Copy size={16} />
-                        </Button>
-                      
+
+                      Call the Foundry-Script with
+
+                      <span className='font-mono pl-2'>
+                        forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {address} --unlocked
+                      </span> <Button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${address} --unlocked`)} title="Copy command" variant="ghost" size="icon" >
+                        <Copy size={16} />
+                      </Button>
+
                     </div>
                   </div>
                 )}
@@ -1009,7 +1011,7 @@ function App() {
           <TabsContent value="eip7702">
             <Eip7702ModeDisplay
               privateKey={eip7702PrivateKey}
-              sessionAccount={_eip7702SessionAccount} 
+              sessionAccount={_eip7702SessionAccount}
               setPrivateKey={setEip7702PrivateKey}
               rpcUrl={rpcUrlForLocalClient} // This prop might not be actively used by Eip7702ModeDisplay currently
               chainId={chainId} // This prop might not be actively used by Eip7702ModeDisplay currently
@@ -1026,10 +1028,10 @@ function App() {
                   Instead, use a factory contract like <a href="https://book.getfoundry.sh/guides/deterministic-deployments-using-create2" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-100">Deterministic Deployer</a> (or a similar CREATE/CREATE2 factory) to deploy your contracts.
                   This gives you a deterministic address: simply add a salt to the contract instance.
                 </p>
-                
+
                 <div className='text-mono'>
                   <code><blockquote>
-                  {'Counter counter = new Counter\{salt: salt\}();'}
+                    {'Counter counter = new Counter\{salt: salt\}();'}
                   </blockquote></code>
                 </div>
                 <p>
