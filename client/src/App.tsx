@@ -160,7 +160,7 @@ function App() {
     }
     // Mark that the private key state has been through its initial load/generate cycle.
     hasInitializedPrivateKeyState.current = true;
-  }, [activeMode, persistKeyInLocalStorage, eip7702PrivateKey]); // Added eip7702PrivateKey to deps
+  }, [activeMode, persistKeyInLocalStorage]); // REMOVED eip7702PrivateKey from deps
 
   // --- Effect to Save/Remove EIP-7702 Private Key based on Persistence ---
   useEffect(() => {
