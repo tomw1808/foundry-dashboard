@@ -381,6 +381,8 @@ function App() {
                   }
                 }
 
+                console.log({originalReceipt, deployedContractAddress})
+
                 result = {
                   ...originalReceipt,
                   contractAddress: deployedContractAddress || originalReceipt.contractAddress || null, // Override or set contractAddress
@@ -398,7 +400,7 @@ function App() {
             try {
               console.log(`[${requestId}] Standard eth_getTransactionReceipt for: ${requestedTxHash}`);
               result = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
-              // console.log(`[${requestId}] Standard receipt fetched:`, JSON.stringify(result, jsonReplacer, 2));
+              console.log(`[${requestId}] Standard receipt fetched:`, JSON.stringify(result, jsonReplacer, 2));
             } catch (err: any) {
               console.error(`[${requestId}] Error calling publicClient.getTransactionReceipt:`, err);
               error = { code: -32603, message: `Failed to get transaction receipt: ${err.message || 'Unknown error'}` };
