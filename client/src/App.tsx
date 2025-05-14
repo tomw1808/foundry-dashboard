@@ -386,9 +386,13 @@ function App() {
               const originalReceipt = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
               if (originalReceipt) {
                 let deployedContractAddress: Address | null = null;
+                // The eip7702SessionAccount is the EOA that authorizes and, in this specific setup,
+                // is stated to be the emitter of the ContractCreated event.
+                const expectedEmitterAddress = eip7702SessionAccount?.address;
+
                 for (const log of originalReceipt.logs) {
-                  // Check if the log is from our custom Simple7702Account contract and matches the event topic
-                  if (log.address.toLowerCase() === SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS.toLowerCase() &&
+                  // Check if the log is from the expected emitter and matches the event topic
+                  if (expectedEmitterAddress && log.address.toLowerCase() === expectedEmitterAddress.toLowerCase() &&
                       log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
                     
                     // The contract address is in the data field. Data is 0x + 64 hex chars (32 bytes).
