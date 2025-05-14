@@ -440,7 +440,7 @@ function App() {
             if (typeof result.type === 'string' && result.type.toLowerCase() === 'eip7702') {
               console.warn(`[${requestId}] Normalizing receipt type from "${result.type}" to "0x4" (EIP-7702 standard type).`);
               result.type = '0x4'; // EIP-2718 type for EIP-7702
-            } else if (result.type === null || result.type === undefined) {
+            } else if (result.type === null || result.type === undefined || typeof result.type === 'string') {
               // If type is missing from the receipt, default to '0x2' (EIP-1559) as a common modern type.
               // Foundry expects a type.
               console.warn(`[${requestId}] Receipt type is ${result.type}. Defaulting to "0x2".`);
