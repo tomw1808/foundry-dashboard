@@ -57,7 +57,21 @@ function App() {
   const [pendingSignRequests, setPendingSignRequests] = useState<SignRequest[]>([]);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
   const [processedRequests, setProcessedRequests] = useState(0);
-  const [trackedTxs, setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
+
+  // --- Tracked Transactions State with Ref for Closures ---
+  const [_trackedTxs, _setTrackedTxs] = useState<Map<Hex, TrackedTxInfo>>(new Map());
+  const trackedTxsRef = useRef(_trackedTxs);
+
+  const setTrackedTxs = (updater: React.SetStateAction<Map<Hex, TrackedTxInfo>>) => {
+    _setTrackedTxs(prevMap => {
+      const newMap = typeof updater === 'function' ? updater(prevMap) : updater;
+      trackedTxsRef.current = newMap;
+      return newMap;
+    });
+  };
+  // Use _trackedTxs for useEffect dependencies if needed for re-running effects based on state change.
+  // Use trackedTxsRef.current for accessing the latest value within closures like handleRpcRequest.
+
   const [activeMode, setActiveMode] = useState<'browser' | 'eip7702' | 'erc4337'>('browser'); // New mode state
   const [eip7702PrivateKey, setEip7702PrivateKey] = useState<Hex | null>(null); // State for session private key
   const [eip7702SessionAccount, setEip7702SessionAccount] = useState<PrivateKeyAccount | null>(null); // Derived session account
@@ -154,12 +168,12 @@ function App() {
   const POLLING_INTERVAL = 4000; // Check every 4 seconds
 
   useEffect(() => {
-    if (!publicClient || trackedTxs.size === 0 || !chainId) {
+    if (!publicClient || trackedTxsRef.current.size === 0 || !chainId) {
       return; // No client, nothing to track, or chainId missing
     }
 
     const intervalId = setInterval(async () => {
-      const pendingHashes = Array.from(trackedTxs.entries())
+      const pendingHashes = Array.from(trackedTxsRef.current.entries())
         .filter(([_, tx]) => (tx.status === 'pending' || tx.status === 'checking') && tx.chainId === chainId) // Only poll for current chain
         .map(([hash, _]) => hash);
 
@@ -168,7 +182,7 @@ function App() {
       console.trace(`Polling receipts for ${pendingHashes.length} transactions on chain ${chainId}...`);
 
       for (const hash of pendingHashes) {
-        const txInfo = trackedTxs.get(hash);
+        const txInfo = trackedTxsRef.current.get(hash);
         // Double check it's still pending/checking before fetching
         if (!txInfo || (txInfo.status !== 'pending' && txInfo.status !== 'checking')) {
           continue;
@@ -248,7 +262,7 @@ function App() {
 
     return () => clearInterval(intervalId); // Cleanup interval on unmount or dependency change
 
-  }, [trackedTxs, publicClient, chainId]); // Re-run if trackedTxs, client or chain changes
+  }, [_trackedTxs, publicClient, chainId]); // Re-run if _trackedTxs (actual state) changes
 
 
   // --- Block Number Watching Effect ---
@@ -357,8 +371,8 @@ function App() {
           }
 
           let eip7702DeploymentInfo: TrackedTxInfo | undefined;
-          // Iterate over trackedTxs to find if this txHash corresponds to an EIP-7702 deployment
-          for (const txInfo of trackedTxs.values()) {
+          // Iterate over trackedTxsRef.current to find if this txHash corresponds to an EIP-7702 deployment
+          for (const txInfo of trackedTxsRef.current.values()) {
             if (txInfo.actualTxHash === requestedTxHash && txInfo.isEip7702Deployment) {
               eip7702DeploymentInfo = txInfo;
               break;
@@ -760,6 +774,7 @@ function App() {
                 timestamp: Date.now(),
                 chainId: currentChainIdForEip7702,
                 label: `EIP-7702 Session: ${generateTxLabel(decodedInfoForEip7702)} (UserOp)`,
+                isEip7702Deployment: !sanitizedTx.to, // Set based on original tx's 'to' field
                 // actualTxHash will be filled after inclusion
             };
             setTrackedTxs(prevMap => new Map(prevMap).set(userOpHashForTracking, initialTrackedTx));
@@ -781,8 +796,9 @@ function App() {
                     status: receiptResult.success ? 'success' : 'reverted',
                     blockNumber: receiptResult.receipt?.blockNumber,
                     actualTxHash: receiptResult.receipt?.transactionHash as Hex | undefined,
-                    // Set isEip7702Deployment flag if it was a contract creation
-                    isEip7702Deployment: !sanitizedTx.to ? true : existingTx.isEip7702Deployment,
+                    // isEip7702Deployment is carried over from existingTx via spread (...)
+                    // No need to explicitly set it again here as it's determined at initialTrackedTx creation
+                    // and doesn't change.
                 };
                 return new Map(prevMap).set(userOpHashForTracking, updatedTxInfo);
             }
@@ -867,10 +883,10 @@ function App() {
           // For now, if an error is caught here, the initial 'checking' entry might remain.
           // A more robust solution would involve passing userOpHashForTracking out of the EIP-7702 block's try-catch.
           // However, if sendUserOpResponse.included() itself throws, the 'result' won't be set.
-          trackedTxs.forEach((tx) => { // Attempt to find and update the UserOp status
+          trackedTxsRef.current.forEach((tx) => { // Attempt to find and update the UserOp status using the ref
             if (tx.label.includes(generateTxLabel(payload.decoded)) && tx.status === 'checking') {
               setTrackedTxs(prevMap => {
-                const existingTx = prevMap.get(tx.hash);
+                const existingTx = prevMap.get(tx.hash); // prevMap here is from the setTrackedTxs closure, which is fine
                 if (existingTx) {
                   return new Map(prevMap).set(tx.hash, { ...existingTx, status: 'reverted' });
                 }
