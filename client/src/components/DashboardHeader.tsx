@@ -10,9 +10,10 @@ import {
 
 interface DashboardHeaderProps {
     wsStatus: WsStatus;
+    processedRequests: number;
 }
 
-export function DashboardHeader({ wsStatus }: DashboardHeaderProps) {
+export function DashboardHeader({ wsStatus, processedRequests }: DashboardHeaderProps) {
     let statusColor = '';
     let statusTooltip = '';
 
@@ -40,8 +41,8 @@ export function DashboardHeader({ wsStatus }: DashboardHeaderProps) {
 
     return (
         <header className="w-full max-w-4xl flex justify-between items-center p-4 border-b border-gray-700 mb-6">
-            <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+                <h1 className="text-xl md:text-2xl font-bold">⚡️ Foundry Dashboard</h1>
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -51,8 +52,13 @@ export function DashboardHeader({ wsStatus }: DashboardHeaderProps) {
                             <p>{statusTooltip}</p>
                         </TooltipContent>
                     </Tooltip>
-            </TooltipProvider>
-            <ConnectButton accountStatus="address" chainStatus="icon" showBalance={false} />
+                </TooltipProvider>
+            </div>
+            <div className="flex items-center space-x-4">
+                <div className="text-sm text-gray-400">
+                    Requests: <span className="font-semibold text-gray-200">{processedRequests}</span>
+                </div>
+                <ConnectButton accountStatus="address" chainStatus="icon" showBalance={false} />
             </div>
         </header>
     );

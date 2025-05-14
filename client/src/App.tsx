@@ -951,23 +951,16 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
-      <DashboardHeader wsStatus={wsStatus} />
+      <DashboardHeader wsStatus={wsStatus} processedRequests={processedRequests} />
 
-      {/* Dashboard Status moved above tabs */}
-      <div className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mb-6">
+      {/* Dashboard Status component is removed */}
+      {/* The div that wrapped DashboardStatus can also be removed if it served no other purpose */}
+      {/* <div className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mb-6">
         <h2 className="text-xl mb-4">Dashboard Status</h2>
-        <DashboardStatus
-          wsStatus={wsStatus}
-          isConnected={isConnected}
-          address={address} // Pass browser wallet address here
-          chainId={chainId}
-          processedRequests={processedRequests}
-          copyToClipboard={copyToClipboard}
-        />
-      </div>
+      </div> */}
 
 
-      <main className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg">
+      <main className="w-full max-w-4xl p-4 bg-gray-800 rounded shadow-lg mt-0"> {/* Adjusted margin if needed */}
         <Tabs value={activeMode} onValueChange={(value) => setActiveMode(value as any)} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="browser">Browser Wallet</TabsTrigger>
