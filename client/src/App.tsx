@@ -1096,10 +1096,8 @@ function App() {
               <AlertTitle className="text-blue-300">Tip: Deterministic Deployments with Factories</AlertTitle>
               <AlertDescription className="text-sm text-blue-300/90 space-y-2">
                
-                <p>
-                  Call the Foundry-Script with `forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {eip7702SessionAccountRef.current?.address} --unlocked`  <button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${eip7702SessionAccountRef.current?.address} --unlocked`)} title="Copy Address" className="text-gray-500 hover:text-white">
-                    <Copy size={14} />
-                  </button>
+                <p> 
+                  {/* The forge script command for EIP-7702 mode is now displayed within Eip7702ModeDisplay component */}
                 </p>
               </AlertDescription>
             </Alert>
