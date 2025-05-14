@@ -424,12 +424,18 @@ function App() {
               result = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
               console.log(`[${requestId}] Standard receipt fetched:`, JSON.stringify(result, jsonReplacer, 2));
             } catch (err: any) {
-              console.error(`[${requestId}] Error calling publicClient.getTransactionReceipt:`, err);
-              error = { code: -32603, message: `Failed to get transaction receipt: ${err.message || 'Unknown error'}` };
+              if (err.name === 'TransactionReceiptNotFoundError') {
+                console.log(`[${requestId}] Transaction receipt not found for ${requestedTxHash} (standard flow). Returning null to client.`);
+                result = null; // Foundry expects null if not found
+              } else {
+                console.error(`[${requestId}] Error calling publicClient.getTransactionReceipt (standard flow):`, err);
+                error = { code: -32603, message: `Failed to get transaction receipt: ${err.message || 'Unknown error'}` };
+              }
             }
           }
           // Normalize receipt fields before sending back to Foundry
-          if (result) { // Ensure result is not null
+          // This block should only run if 'result' is truthy (i.e., a receipt was actually found and not set to null due to TransactionReceiptNotFoundError)
+          if (result) {
             // Fix 1: Normalize 'type' field
             if (typeof result.type === 'string' && result.type.toLowerCase() === 'eip7702') {
               console.warn(`[${requestId}] Normalizing receipt type from "${result.type}" to "0x4" (EIP-7702 standard type).`);
