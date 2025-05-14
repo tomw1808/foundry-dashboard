@@ -20,7 +20,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'; // Assuming RainbowKit C
 
 import { generatePrivateKey, privateKeyToAccount, PrivateKeyAccount, sign } from 'viem/accounts'; // For EIP-7702 session key
 import { Eip7702ModeDisplay } from '@/components/Eip7702ModeDisplay'; // New component
-import { createWalletClient, http, encodeFunctionData, decodeEventLog } from 'viem'; // Added decodeEventLog, encodeFunctionData & for local EIP-7702 client
+import { createWalletClient, http, encodeFunctionData, getAddress } from 'viem'; // Added getAddress, encodeFunctionData & for local EIP-7702 client
 
 // --- Configuration Constants for Candide EIP-7702 ---
 // Note: Bundler/Paymaster URLs are kept for now but won't be used in the immediate refactor
@@ -381,43 +381,35 @@ function App() {
 
           if (eip7702DeploymentInfo) {
             console.log(`[${requestId}] Intercepting eth_getTransactionReceipt for EIP-7702 deployment: ${requestedTxHash}`);
+            const CONTRACT_CREATED_EVENT_TOPIC = "0xcf78cf0d6f3d8371e1075c69c492ab4ec5d8cf23a1a239b6a51a1d00be7ca312" as const;
             try {
               const originalReceipt = await publicClient.getTransactionReceipt({ hash: requestedTxHash });
               if (originalReceipt) {
-                // Define the ABI for your ContractDeployed event from your custom Simple7702Account
-                const contractDeployedEventAbi = [{
-                  type: 'event',
-                  name: 'ContractCreated', // Ensure this matches your event name
-                  inputs: [
-                    { name: 'newContractAddress', type: 'address', indexed: false }, // Assuming not indexed
-                  ],
-                  anonymous: false,
-                }] as const;
-
                 let deployedContractAddress: Address | null = null;
                 for (const log of originalReceipt.logs) {
-                  // Check if the log is from your custom Simple7702Account contract
-                  if (log.address.toLowerCase() === SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS.toLowerCase()) {
-                    try {
-                      const decodedLog = decodeEventLog({
-                        abi: contractDeployedEventAbi,
-                        data: log.data,
-                        topics: log.topics,
-                        strict: false, // Be less strict if topics might not perfectly match
-                      });
-                      if (decodedLog.eventName === 'ContractCreated') {
-                        // Access args based on your event definition
-                        deployedContractAddress = (decodedLog.args as { newContractAddress: Address }).newContractAddress;
-                        console.log(`[${requestId}] Found deployed contract address from event: ${deployedContractAddress}`);
-                        break; // Found the address
-                      }
-                    } catch (decodeError) {
-                      // console.warn(`[${requestId}] Failed to decode log for potential ContractDeployed event:`, decodeError, log);
+                  // Check if the log is from our custom Simple7702Account contract and matches the event topic
+                  if (log.address.toLowerCase() === SIMPLE7702_DEFAULT_DELEGATEE_ADDRESS.toLowerCase() &&
+                      log.topics[0]?.toLowerCase() === CONTRACT_CREATED_EVENT_TOPIC) {
+                    
+                    // The contract address is in the data field. Data is 0x + 64 hex chars (32 bytes).
+                    // The address is the last 20 bytes (40 hex chars).
+                    if (log.data && log.data.length === 66) { // 0x + 32 bytes * 2 chars/byte
+                        const addressHex = `0x${log.data.substring(26)}`; // 2 (for "0x") + (32-20)*2 = 2 + 24 = 26
+                        try {
+                            deployedContractAddress = getAddress(addressHex); // Converts to checksummed address
+                            console.log(`[${requestId}] Extracted deployed contract address from log data: ${deployedContractAddress}`);
+                            break; // Found the address
+                        } catch (checksumError) {
+                            console.warn(`[${requestId}] Failed to checksum extracted address ${addressHex}:`, checksumError);
+                            // Potentially log this as an issue, but don't break if other logs might be valid
+                        }
+                    } else {
+                        console.warn(`[${requestId}] ContractCreated event log data has unexpected length: ${log.data}`);
                     }
                   }
                 }
 
-                console.log({originalReceipt, deployedContractAddress})
+                console.log({ originalReceipt, deployedContractAddress })
 
                 result = {
                   ...originalReceipt,
