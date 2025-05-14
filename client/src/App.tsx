@@ -1095,20 +1095,7 @@ function App() {
               <Terminal className="h-4 w-4 !text-blue-400" />
               <AlertTitle className="text-blue-300">Tip: Deterministic Deployments with Factories</AlertTitle>
               <AlertDescription className="text-sm text-blue-300/90 space-y-2">
-                <p>
-                  For EIP-7702 (and ERC-4337) smart accounts, contract deployments must go through the account's `execute` function.
-                  Direct `new MyContract()` in Foundry scripts won't work as expected with these account types.
-                </p>
-                <p>
-                  Instead, use a factory contract like <a href="https://book.getfoundry.sh/guides/deterministic-deployments-using-create2" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-100">Deterministic Deployer</a> (or a similar CREATE/CREATE2 factory) to deploy your contracts.
-                  This gives you a deterministic address: simply add a salt to the contract instance.
-                </p>
-
-                <div className='text-mono'>
-                  <code><blockquote>
-                    {'Counter counter = new Counter\{salt: salt\}();'}
-                  </blockquote></code>
-                </div>
+               
                 <p>
                   Call the Foundry-Script with `forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender {eip7702SessionAccountRef.current?.address} --unlocked`  <button onClick={() => copyToClipboard(`forge script script/YourScript.s.sol --rpc-url http://localhost:3001/api/rpc --broadcast --sender ${eip7702SessionAccountRef.current?.address} --unlocked`)} title="Copy Address" className="text-gray-500 hover:text-white">
                     <Copy size={14} />
