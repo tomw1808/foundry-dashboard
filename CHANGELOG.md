@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.1.0](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.3...v2.1.0) (2025-05-15)
+
+
+### Features
+
+* Add sequence number to requests for ordering on frontend ([2b61519](https://github.com/tomw1808/foundry-dashboard/commit/2b615195291e060fb426e60d3f836b433d22b4f7))
+* Add timestamp to sign requests for tracking and ordering ([9a025f5](https://github.com/tomw1808/foundry-dashboard/commit/9a025f586c5693183a8e3ed2854a5a5e601c1532))
+
+
+### Bug Fixes
+
+* createdAt is child of payload ([782cf1e](https://github.com/tomw1808/foundry-dashboard/commit/782cf1e314230eeadf7b1a271195ece22145861e))
+* Format timestamp with milliseconds in PendingActionsList ([f200368](https://github.com/tomw1808/foundry-dashboard/commit/f200368f308d589987faaab87e430a40772130c9))
+* Handle BigInt serialization in JSON.stringify for broadcast ([16f181d](https://github.com/tomw1808/foundry-dashboard/commit/16f181ddb171f56ebed2a75ac36519fd94971d83))
+* missing closing brackets syntax error ([fce4f66](https://github.com/tomw1808/foundry-dashboard/commit/fce4f663163da11ec68c600ffb13d7cae8ed5988))
+
 ## [2.0.3](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.2...v2.0.3) (2025-05-15)
 
 
