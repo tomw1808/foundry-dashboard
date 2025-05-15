@@ -2,6 +2,8 @@
 
 ![Foundry Dashboard](images/image-2.png)
 
+See it action: https://youtu.be/2ol_6IE0xk4
+
 **Bring the power of browser wallets (and gasless Sepolia transactions via EIP-7702) to your Foundry workflow.**
 
 *(Note: This is an unofficial community project inspired by Truffle Dashboard and is not affiliated with the official Foundry team. This is an early preview.)*
