@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.2...v2.0.3) (2025-05-15)
+
+
+### Bug Fixes
+
+* updated readme ([7ffff02](https://github.com/tomw1808/foundry-dashboard/commit/7ffff027a31ba29930d358d4791cc192d3b8ca13))
+
 ## [2.0.2](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.1...v2.0.2) (2025-05-14)
 
 

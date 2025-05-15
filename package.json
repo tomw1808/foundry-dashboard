@@ -1,6 +1,6 @@
 {
   "name": "foundry-dashboard",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "A local dashboard for interacting with Foundry projects via browser wallets similar to how Truffle Dashboard worked before. Just optimized for Foundry Projects with ABI decoding.",
   "main": "dist/server/server.js",
   "repository": {
