@@ -125,9 +125,17 @@ wss.on('connection', (ws: WebSocket) => {
     ws.send(JSON.stringify({ type: 'welcome', message: 'Connected to Forge Dashboard WebSocket' }));
 });
 
+// Helper function to handle BigInt serialization for JSON.stringify
+const jsonReplacer = (_key: string, value: any): any => {
+    if (typeof value === 'bigint') {
+        return value.toString();
+    }
+    return value;
+};
+
 // Function to broadcast messages to all connected WebSocket clients
 function broadcast(message: any): void { // Add type for message and return type
-    const data = JSON.stringify(message);
+    const data = JSON.stringify(message, jsonReplacer); // Use the replacer here
     wss.clients.forEach((client: WebSocket) => { // Add type for client
         if (client.readyState === WebSocket.OPEN) {
             client.send(data);
