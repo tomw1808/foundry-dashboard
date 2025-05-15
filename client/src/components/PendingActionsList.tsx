@@ -29,13 +29,15 @@ export function PendingActionsList({
             {pendingSignRequests
                 .sort((a, b) => a.receivedAt - b.receivedAt) // Sort by receivedAt, oldest first
                 .map((request) => {
-                    const receivedTime = new Date(request.receivedAt).toLocaleTimeString([], {
+                    const dateObject = new Date(request.receivedAt);
+                    const timeString = dateObject.toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
-                        fractionalSecondDigits: 3,
                         hour12: false
                     });
+                    const milliseconds = dateObject.getMilliseconds().toString().padStart(3, '0');
+                    const receivedTime = `${timeString}.${milliseconds}`;
                     return (
                         <div key={request.requestId} className="mb-4 p-4 border border-yellow-600 rounded bg-gray-800 shadow-md">
                             <div className="flex justify-between items-center mb-2">
