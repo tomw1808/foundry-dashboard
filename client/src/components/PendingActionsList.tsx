@@ -27,9 +27,9 @@ export function PendingActionsList({
         <div className="mt-8 w-full">
             <h3 className="text-xl mb-4 text-yellow-400">Pending Actions</h3>
             {pendingSignRequests
-                .sort((a, b) => a.receivedAt - b.receivedAt) // Sort by receivedAt, oldest first
+                .sort((a, b) => a.payload.receivedAt - b.payload.receivedAt) // Sort by receivedAt, oldest first
                 .map((request) => {
-                    const dateObject = new Date(request.receivedAt);
+                    const dateObject = new Date(request.payload.receivedAt);
                     const timeString = dateObject.toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',

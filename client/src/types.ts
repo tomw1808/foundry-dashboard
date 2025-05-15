@@ -31,11 +31,11 @@ export type RpcPayload = {
     params: any[];
     id: number | string;
     decoded?: DecodedInfo | null
+    receivedAt: number; // Timestamp when the request was received by the frontend
 };
 export type SignRequest = {
     requestId: string;
     payload: RpcPayload;
-    receivedAt: number; // Timestamp when the request was received by the frontend
 };
 
 // Define type for tracked transaction info
