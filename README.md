@@ -12,6 +12,8 @@ Ever missed the convenience of Truffle Dashboard when working with Foundry? Wish
 
 Foundry Dashboard aims to bridge these gaps. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet, and now also integrates EIP-7702 for sponsored transactions on Sepolia via [Candide.dev's infrastructure](https://candide.dev).
 
+If you are new to Ethereum Blockchain Development and you are looking to deploy a smart contract but you need Sepolia ETH and none of the faucets are working, this might fix your problem. Deploy and interact with smart contracts gasless!
+
 ## The Problem Solved 🧩
 
 Foundry is an incredibly powerful toolkit for smart contract development. However, interacting with deployed contracts or broadcasting transactions via `forge script` often requires handling private keys directly or using hardware wallets via specific flags. While secure, this can sometimes slow down the rapid iteration loop, especially during testing and deployment phases on testnets or even local nodes like Anvil.
