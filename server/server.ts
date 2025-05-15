@@ -362,7 +362,8 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
             method,
             params,
             id: originalId,
-            decoded: decodedInfo // Include decoding result
+            decoded: decodedInfo, // Include decoding result
+            receivedAt: Date.now() // Add timestamp here
         }
     });
 

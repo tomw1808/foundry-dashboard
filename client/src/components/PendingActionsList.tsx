@@ -26,12 +26,25 @@ export function PendingActionsList({
     return (
         <div className="mt-8 w-full">
             <h3 className="text-xl mb-4 text-yellow-400">Pending Actions</h3>
-            {pendingSignRequests.map((request) => (
-                <div key={request.requestId} className="mb-4 p-4 border border-yellow-600 rounded bg-gray-800 shadow-md">
-                    <h4 className="text-lg font-semibold mb-2">Request ID: <span className="font-mono text-sm">{request.requestId}</span></h4>
-                    <p className="mb-1">Method: <span className="font-semibold">{request.payload.method}</span></p>
+            {pendingSignRequests
+                .sort((a, b) => a.receivedAt - b.receivedAt) // Sort by receivedAt, oldest first
+                .map((request) => {
+                    const receivedTime = new Date(request.receivedAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        fractionalSecondDigits: 3,
+                        hour12: false
+                    });
+                    return (
+                        <div key={request.requestId} className="mb-4 p-4 border border-yellow-600 rounded bg-gray-800 shadow-md">
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-lg font-semibold">Request ID: <span className="font-mono text-sm">{request.requestId}</span></h4>
+                                <span className="text-xs text-gray-400">Received: {receivedTime}</span>
+                            </div>
+                            <p className="mb-1">Method: <span className="font-semibold">{request.payload.method}</span></p>
 
-                    {/* Display Decoded Info if available */}
+                            {/* Display Decoded Info if available */}
                     {request.payload.decoded ? (
                         <div className="mb-3 p-2 border border-blue-500 rounded bg-gray-700">
                             <p className="text-blue-300 font-semibold mb-1">Decoded Action:</p>

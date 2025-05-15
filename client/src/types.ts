@@ -32,7 +32,11 @@ export type RpcPayload = {
     id: number | string;
     decoded?: DecodedInfo | null
 };
-export type SignRequest = { requestId: string; payload: RpcPayload };
+export type SignRequest = {
+    requestId: string;
+    payload: RpcPayload;
+    receivedAt: number; // Timestamp when the request was received by the frontend
+};
 
 // Define type for tracked transaction info
 export interface TrackedTxInfo {
