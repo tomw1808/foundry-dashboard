@@ -2,13 +2,13 @@
 
 ![Foundry Dashboard](images/image-1.png)
 
-**Bring the power of browser wallets like MetaMask to your Foundry workflow.**
+**Bring the power of browser wallets (and gasless Sepolia transactions via EIP-7702) to your Foundry workflow.**
 
-*(Note: This is an unofficial community project inspired by Truffle Dashboard and is not affiliated with the official Foundry team.)*
+*(Note: This is an unofficial community project inspired by Truffle Dashboard and is not affiliated with the official Foundry team. This is an early preview.)*
 
-Ever missed the convenience of Truffle Dashboard when working with Foundry? Wished you could use your familiar browser wallet to sign transactions triggered by `forge script --broadcast` without juggling private keys or complex setups?
+Ever missed the convenience of Truffle Dashboard when working with Foundry? Wished you could use your familiar browser wallet to sign transactions triggered by `forge script --broadcast` without juggling private keys? Or better yet, deploy and test on Sepolia *without needing any Sepolia ETH*?
 
-Foundry Dashboard aims to bridge that gap. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet.
+Foundry Dashboard aims to bridge these gaps. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet, and now also integrates EIP-7702 for sponsored transactions on Sepolia via Candide.dev's infrastructure.
 
 ## The Problem Solved 🧩
 
@@ -29,12 +29,13 @@ When `forge script` needs to send a transaction (`eth_sendTransaction`), the flo
 1.  `forge script` sends the request to the Foundry Dashboard server (`/api/rpc`).
 2.  The server attempts to decode the transaction data using the ABIs found in the specified project path.
 3.  The server pushes the request (including any decoded information) via WebSocket to the connected web frontend.
-4.  The frontend displays the request details (decoded, if possible) and prompts you to approve or reject.
-5.  You approve/reject in your browser wallet (e.g., MetaMask).
-6.  The frontend sends the signed transaction (or rejection error) back to the local server via WebSocket.
-7.  The server relays the JSON-RPC response back to the waiting `forge script` process.
+4.  The frontend displays the request details and offers signing options:
+    *   **Browser Wallet Mode:** Prompts you to approve or reject in your connected browser wallet (e.g., MetaMask). The signed transaction is sent back.
+    *   **EIP-7702 Mode (Sepolia):** Uses a local session key to authorize the transaction. The dashboard then constructs an EIP-7702 UserOperation, sends it to Candide.dev's bundler and paymaster infrastructure, allowing for gasless transactions on Sepolia (you don't need Sepolia ETH in your session account).
+5.  The frontend sends the signed transaction (or UserOperation hash and eventual transaction hash for EIP-7702) or rejection error back to the local server via WebSocket.
+6.  The server relays the JSON-RPC response back to the waiting `forge script` process.
 
-Other standard RPC calls (`eth_chainId`, `eth_call`, etc.) are proxied to the frontend wallet via the WebSocket connection.
+Other standard RPC calls (`eth_chainId`, `eth_call`, etc.) are proxied to the frontend wallet (or handled by the dashboard for EIP-7702 context) via the WebSocket connection.
 
 ## Architectural Decisions 🏗️
 
@@ -83,10 +84,16 @@ We considered several approaches before settling on the current architecture (No
         ```
 
 5.  **Using the Dashboard UI:**
-    *   Connect your browser wallet (e.g., MetaMask) to the dashboard webpage. Ensure it's connected to the correct network you intend to interact with.
+    *   Connect your browser wallet (e.g., MetaMask) to the dashboard webpage.
+    *   **Choose your mode:**
+        *   **Browser Wallet Mode:** Standard signing through your connected wallet. Ensure it's on the network you intend to interact with.
+        *   **EIP-7702 Sponsored Mode (Sepolia Only):**
+            *   The dashboard will generate or allow you to set a temporary session private key.
+            *   Transactions sent in this mode will be relayed through Candide.dev's bundler and paymaster on Sepolia. **You do not need Sepolia ETH in the session account for this to work.** This is excellent for testing deployments and interactions without faucet hunting.
+            *   You can optionally persist the session key in local storage for convenience during development (with appropriate security warnings).
     *   When a transaction request arrives from Foundry, it will appear in the "Pending Actions" section.
     *   Review the details (decoded information will be shown if available).
-    *   Click "Approve in Wallet" to trigger the signing prompt in your browser wallet, or "Reject" to cancel.
+    *   Click "Approve" (or "Approve in Wallet") to trigger the signing/authorization process, or "Reject" to cancel.
 
 ## Transaction Decoding 🧐
 
