@@ -1,6 +1,6 @@
 # Foundry Dashboard ⚡️🦊
 
-![Foundry Dashboard](images/image-1.png)
+![Foundry Dashboard](images/image-2.png)
 
 **Bring the power of browser wallets (and gasless Sepolia transactions via EIP-7702) to your Foundry workflow.**
 
@@ -8,7 +8,7 @@
 
 Ever missed the convenience of Truffle Dashboard when working with Foundry? Wished you could use your familiar browser wallet to sign transactions triggered by `forge script --broadcast` without juggling private keys? Or better yet, deploy and test on Sepolia *without needing any Sepolia ETH*?
 
-Foundry Dashboard aims to bridge these gaps. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet, and now also integrates EIP-7702 for sponsored transactions on Sepolia via Candide.dev's infrastructure.
+Foundry Dashboard aims to bridge these gaps. It's a lightweight, local tool that acts as a secure intermediary between your Foundry scripts and your browser wallet, and now also integrates EIP-7702 for sponsored transactions on Sepolia via [Candide.dev's infrastructure](https://candide.dev).
 
 ## The Problem Solved 🧩
 
