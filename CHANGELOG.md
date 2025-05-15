@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.1...v2.0.2) (2025-05-14)
+
+
+### Bug Fixes
+
+* check for empty bundler and paymaster url ([3fa333b](https://github.com/tomw1808/foundry-dashboard/commit/3fa333bd9e3066630a7c338bfe783e3891614301))
+
 ## [2.0.1](https://github.com/tomw1808/foundry-dashboard/compare/v2.0.0...v2.0.1) (2025-05-14)
 
 
