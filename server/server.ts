@@ -43,6 +43,9 @@ let loadedArtifacts: LoadedArtifact[] = [];
 // Store pending RPC requests: Map<requestId, PendingRequest>
 const pendingRequests = new Map<string, PendingRequest>();
 
+// Global counter for request sequence
+let requestSequenceCounter = 0;
+
 // Configuration will be passed via startServer function
 let artifactsOutDir: string = ''; // Initialize, will be set in startServer
 
@@ -363,7 +366,8 @@ app.post('/api/rpc', (req: Request<any, any, RpcRequestBody>, res: Response) => 
             params,
             id: originalId,
             decoded: decodedInfo, // Include decoding result
-            receivedAt: Date.now() // Add timestamp here
+            receivedAt: Date.now(), // Add timestamp here
+            sequenceNumber: ++requestSequenceCounter // Add incrementing sequence number
         }
     });
 

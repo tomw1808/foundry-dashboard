@@ -27,7 +27,7 @@ export function PendingActionsList({
         <div className="mt-8 w-full">
             <h3 className="text-xl mb-4 text-yellow-400">Pending Actions</h3>
             {pendingSignRequests
-                .sort((a, b) => a.payload.receivedAt - b.payload.receivedAt) // Sort by receivedAt, oldest first
+                .sort((a, b) => a.payload.sequenceNumber - b.payload.sequenceNumber) // Sort by sequenceNumber, oldest first
                 .map((request) => {
                     const dateObject = new Date(request.payload.receivedAt);
                     const timeString = dateObject.toLocaleTimeString([], {
@@ -40,9 +40,14 @@ export function PendingActionsList({
                     const receivedTime = `${timeString}.${milliseconds}`;
                     return (
                         <div key={request.requestId} className="mb-4 p-4 border border-yellow-600 rounded bg-gray-800 shadow-md">
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-lg font-semibold">Request ID: <span className="font-mono text-sm">{request.requestId}</span></h4>
-                                <span className="text-xs text-gray-400">Received: {receivedTime}</span>
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex-grow">
+                                    <h4 className="text-lg font-semibold">
+                                        <span className="text-gray-400 text-sm mr-2">#{request.payload.sequenceNumber}</span>
+                                        Request ID: <span className="font-mono text-sm">{request.requestId}</span>
+                                    </h4>
+                                </div>
+                                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">Received: {receivedTime}</span>
                             </div>
                             <p className="mb-1">Method: <span className="font-semibold">{request.payload.method}</span></p>
 

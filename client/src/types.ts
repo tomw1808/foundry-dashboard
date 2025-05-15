@@ -32,6 +32,7 @@ export type RpcPayload = {
     id: number | string;
     decoded?: DecodedInfo | null
     receivedAt: number; // Timestamp when the request was received by the frontend
+    sequenceNumber: number; // Sequential counter for ordering
 };
 export type SignRequest = {
     requestId: string;
