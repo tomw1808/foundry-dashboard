@@ -47,7 +47,7 @@ export function PendingActionsList({
                             <p className="mb-1">Method: <span className="font-semibold">{request.payload.method}</span></p>
 
                             {/* Display Decoded Info if available */}
-                    {request.payload.decoded ? (
+                        {request.payload.decoded ? (
                         <div className="mb-3 p-2 border border-blue-500 rounded bg-gray-700">
                             <p className="text-blue-300 font-semibold mb-1">Decoded Action:</p>
                             {request.payload.decoded.type === 'deployment' && (
@@ -120,8 +120,8 @@ export function PendingActionsList({
                             Reject
                         </button>
                     </div>
-                </div>
-            ))}
+                </div>)}
+            )}
         </div>
     );
 }
